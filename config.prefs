@@ -1,3 +1,11 @@
+# See README for format of this file
+# Lines starting with # are ignored
+# Empty lines are ignored
+# Each valid line must be of the form:
+#   name=value
+#     OR
+#   name = value
+#
 # Make USB_SERIAL a MODULE so that module options can be set
 USB_SERIAL=m
 # Enable staging drivers
