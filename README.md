@@ -1,5 +1,6 @@
-# kernel_build
 Download and build Linux kernel source from kernel.org
+- Has 'one-touch' default behavior
+- Behavior can be customized using environment variables
 
 ## DEFAULT behavior:
 - Kernel source is downloaded and built in directory where this script is
