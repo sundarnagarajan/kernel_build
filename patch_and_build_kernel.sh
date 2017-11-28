@@ -40,7 +40,6 @@ COMPILE_OUT_FILENAME=$(basename "$COMPILE_OUT_FILENAME")
 SILENTCONFIG_OUT_FILENAME=$(basename "$SILENTCONFIG_OUT_FILENAME")
 CHOSEN_OUT_FILENAME=$(basename "$CHOSEN_OUT_FILENAME")
 
-START_END_TIME_FILE="/tmp/start_end.time"
 CHECK_REQD_PKGS_SCRIPT=$(printf %q "${CURDIR}/${CHECK_REQD_PKGS_SCRIPT}")
 KERNEL_SOURCE_SCRIPT=$(printf %q "${CURDIR}/${KERNEL_SOURCE_SCRIPT}")
 SHOW_AVAIL_KERNELS_SCRIPT=$(printf %q "${CURDIR}/${SHOW_AVAIL_KERNELS_SCRIPT}")
@@ -247,7 +246,7 @@ function kernel_version()
 function set_build_dir {
     # Check there is exactly one dir extracted - we depend on this
     cd "${DEB_DIR}"
-    if [ $(ls | wc -l) -ne 1 ]; then
+    if [ $(ls -1 | fgrep -v $(basename $(printf "%q" ${START_END_TIME_FILE})) | wc -l) -ne 1 ]; then
         echo "Multiple top-level dir extracted - almost certainly wrong"
         exit 1
     fi
@@ -369,7 +368,6 @@ function build_kernel {
     $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILE}" 2>&1
     [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILE}"; echo ""; echo "See ${COMPILE_OUT_FILE}"; exit 1)
 
-    \rm -f "${COMPILE_OUT_FILE}"
     show_timing_msg "Kernel deb build finished" "yestee" "$(get_hms)"
     show_timing_msg "Kernel build finished" "notee" ""
 
@@ -380,18 +378,20 @@ function build_kernel {
     cd "${DEB_DIR}"
     ls -1 *.deb | sed -e "s/^/${INDENT}/"
     echo "------------------------------------------------------------------------------"
+    \rm -f "${COMPILE_OUT_FILE}" "${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}" "$START_END_TIME_FILE"
 }
 
 #-------------------------------------------------------------------------
 # Actual build steps after this
 #-------------------------------------------------------------------------
+choose_deb_dir
+START_END_TIME_FILE="${DEB_DIR}/start_end.out"
 rm -f "$START_END_TIME_FILE"
 # Show available kernels and kernel version of available config
 if [ -x "${SHOW_AVAIL_KERNELS_SCRIPT}" ]; then
     $SHOW_AVAIL_KERNELS_SCRIPT
 fi
     
-choose_deb_dir
 get_kernel_source
 set_build_dir
 apply_patches
