@@ -17,29 +17,29 @@ Download and build Linux kernel source from kernel.org
 
 ### Things that can be changed using environment variables:
 #### KERNEL_TYPE:  
-    - Will filter available kernels
-    - IGNORED if it is not a recognized type: latest|mainline|stable|longterm
+- Will filter available kernels
+- IGNORED if it is not a recognized type: latest|mainline|stable|longterm
 
 #### KERNEL_VERSION:
-    - Will override version from config file
-    - Will filter available kernels
+- Will override version from config file
+- Will filter available kernels
 
 #### KERNEL_CONFIG:
-    - FULL PATH to existing config file
-    - Will override config.kernel in this directory
+- FULL PATH to existing config file
+- Will override config.kernel in this directory
 
 #### KERNEL_BUILD_DIR:
-    - Overrides current_dir/debs
-    - All path components except the last one MUST exist
-    - If last path ocmponent does not exist, it is created
-    - If last path component exists, all files/dirs under that path are DELETED
+- Overrides current_dir/debs
+- All path components except the last one MUST exist
+- If last path ocmponent does not exist, it is created
+- If last path component exists, all files/dirs under that path are DELETED
 
 #### NUM_THREADS:
-    - Number of threads to use
+- Number of threads to use
 
 #### KERNEL_CONFIG_PREFS: 
-    - FULL path to file containing name=value pairs that will be applied to the config while building
-    - See config.prefs format below
+- FULL path to file containing name=value pairs that will be applied to the config while building
+- See config.prefs format below
 
 ### config.prefs or KERNEL_CONFIG_PREFS format:
 - Lines starting with '#' are ignored
