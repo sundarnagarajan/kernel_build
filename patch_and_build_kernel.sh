@@ -39,7 +39,7 @@ IMAGE_NAME=bzImage
 # Probably don't have to change anything below this
 #-------------------------------------------------------------------------
 
-SCRIPT_DIR=$(printf "%q" $(readlink -f $(dirname $0)))
+SCRIPT_DIR="$(readlink -f $(dirname $0))"
 
 #-------------------------------------------------------------------------
 # functions
@@ -65,10 +65,31 @@ function choose_deb_dir {
     # If KERNEL_BUILD_DIR is not set or All components of KERNEL_BUILD_DIR
     # except last component do not exist, DEB_DIR is set to 
     # ${CURDIR}/debs
+    #
+    # KERNEL_BUILD_DIR (any path component) canot contain spaces or colons
+    # This is a limitation of the Linux kernel Makefile - you will get an error
+    # that looks like:
+    # Makefile:128: *** main directory cannot contain spaces nor colons.  Stop.
 
-    CURDIR=$(printf %q "$(readlink -f $PWD)")
+    CURDIR="$(readlink -f $PWD)"
     unset DEB_DIR
+    BAD_DIR_MSG="Linux kernel cannot be built under a path containing spaces or colons
+This is a limitation of the Linux kernel Makefile - you will get an error
+that looks like:
+  Makefile:128: *** main directory cannot contain spaces nor colons.  Stop."
+
     if [ -n "${KERNEL_BUILD_DIR}" ]; then
+        case "${KERNEL_BUILD_DIR}" in
+                *\ * )
+                    echo "$BAD_DIR_MSG"
+                    exit 1
+                    ;;
+                *:* )
+                    echo "$BAD_DIR_MSG"
+                    exit 1
+                    ;;
+        esac
+
         KERNEL_BUILD_DIR=$(readlink -f "${KERNEL_BUILD_DIR}")
         BUILD_DIR_PARENT=$(dirname "${KERNEL_BUILD_DIR}")
         if [ -d "${BUILD_DIR_PARENT}" ]; then
@@ -107,7 +128,17 @@ function choose_deb_dir {
 
     fi
     if [ -z "${DEB_DIR}" ]; then
-        DEB_DIR=$(printf %q "${CURDIR}/debs")
+        DEB_DIR="${CURDIR}/debs"
+        case "${KERNEL_BUILD_DIR}" in
+                *\ * )
+                    echo "$BAD_DIR_MSG"
+                    exit 1
+                    ;;
+                *:* )
+                    echo "$BAD_DIR_MSG"
+                    exit 1
+                    ;;
+        esac
         rm -rf "${DEB_DIR}"
         mkdir "${DEB_DIR}"
     fi
@@ -131,19 +162,19 @@ function set_vars {
     START_END_TIME_FILE=$(basename "$START_END_TIME_FILE")
 
     # Required scripts can ONLY be in the same dir as this script
-    KERNEL_SOURCE_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${KERNEL_SOURCE_SCRIPT}")
-    SHOW_AVAIL_KERNELS_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${SHOW_AVAIL_KERNELS_SCRIPT}")
-    UPDATE_CONFIG_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${UPDATE_CONFIG_SCRIPT}")
-    CHECK_REQD_PKGS_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${CHECK_REQD_PKGS_SCRIPT}")
+    KERNEL_SOURCE_SCRIPT="${SCRIPT_DIR}/${KERNEL_SOURCE_SCRIPT}"
+    SHOW_AVAIL_KERNELS_SCRIPT="${SCRIPT_DIR}/${SHOW_AVAIL_KERNELS_SCRIPT}"
+    UPDATE_CONFIG_SCRIPT="${SCRIPT_DIR}/${UPDATE_CONFIG_SCRIPT}"
+    CHECK_REQD_PKGS_SCRIPT="${SCRIPT_DIR}/${CHECK_REQD_PKGS_SCRIPT}"
 
     # DEB_DIR set in separate function because it has more complex logic
     choose_deb_dir
 
     # Debug outputs are always in DEB_DIR
-    SILENTCONFIG_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}")
-    CHOSEN_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${CHOSEN_OUT_FILENAME}")
-    COMPILE_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${COMPILE_OUT_FILENAME}")
-    START_END_TIME_FILEPATH=$(printf "%q" "${DEB_DIR}/$START_END_TIME_FILE")
+    SILENTCONFIG_OUT_FILEPATH="${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}"
+    CHOSEN_OUT_FILEPATH="${DEB_DIR}/${CHOSEN_OUT_FILENAME}"
+    COMPILE_OUT_FILEPATH="${DEB_DIR}/${COMPILE_OUT_FILENAME}"
+    START_END_TIME_FILEPATH="${DEB_DIR}/$START_END_TIME_FILE"
 
     # CONFIG_FILE, PATCH_FILE and KERNEL_CONFIG_PREFS can be overridden by
     #  environment variables
@@ -299,7 +330,10 @@ function is_linux_kernel_source()
     # $1: kernel directory containing Makefile
     # Returns: 0 if it looks like linux kernel Makefile
     #          1 otherwise
-    local help_out=$(make -s -C $1 help)
+    local help_out=$(make -s -C "$1" help)
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
     for target in clean mrproper distclean config menuconfig xconfig oldconfig defconfig silentoldconfig modules_install modules_prepare kernelversion kernelrelease install
     do
         echo "$help_out" | grep -q "^[[:space:]][[:space:]]*$target[[:space:]][[:space:]]*-[[:space:]]"
@@ -329,7 +363,7 @@ function kernel_version()
     fi
     is_linux_kernel_source "$KERN_DIR" || return 1
     # (At least newer) kernel Makefiles have a built in target to return kernel version
-    echo $(make -s -C $KERN_DIR -s kernelversion 2>/dev/null)
+    echo $(make -s -C "$KERN_DIR" -s kernelversion 2>/dev/null)
     return $?
 }
 
@@ -340,7 +374,7 @@ function set_build_dir {
         echo "Multiple top-level dir extracted - almost certainly wrong"
         exit 1
     fi
-    BUILD_DIR=$(printf %q "${DEB_DIR}/$(ls | head -1)")
+    BUILD_DIR=$(echo "${DEB_DIR}/$(ls | head -1)")
     cd "${SCRIPT_DIR}"
 
     if [ ! -d "$BUILD_DIR" ]; then
@@ -425,7 +459,7 @@ function run_make_silentoldconfig {
     fi
     local MAKE_CONFIG_CMD="make silentoldconfig"
     
-    OLD_DIR=$(pwd)
+    OLD_DIR="$(pwd)"
     cd "${BUILD_DIR}"
     PYTHONUNBUFFERED=yes $UPDATE_CONFIG_SCRIPT "${BUILD_DIR}" "${SILENTCONFIG_OUT_FILEPATH}" "${CHOSEN_OUT_FILEPATH}" "${MAKE_CONFIG_CMD}" "${KERNEL_CONFIG_PREFS}"
     ret=$?
@@ -441,19 +475,19 @@ function build_kernel {
 
     show_timing_msg "Kernel build start" "yestee" ""
     run_make_silentoldconfig
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
     $MAKE_THREADED $IMAGE_NAME 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
     show_timing_msg "Kernel $IMAGE_NAME build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel modules build start" "notee" ""; SECONDS=0
     $MAKE_THREADED modules 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
     show_timing_msg "Kernel modules build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel deb build start" "notee" ""; SECONDS=0
     $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
 
     show_timing_msg "Kernel deb build finished" "yestee" "$(get_hms)"
     show_timing_msg "Kernel build finished" "notee" ""

@@ -160,7 +160,7 @@ def non_matching_keys(prefs_dict, sc):
     ret = OrderedDict()
     for (k, v) in prefs_dict.items():
         try:
-            CMD = '%s --state %s' % (sc, k)
+            CMD = '"%s" --state %s' % (sc, k)
             x = subprocess.check_output(CMD, shell=True)
             x = x.strip().decode('utf8')
             v = v.strip()
