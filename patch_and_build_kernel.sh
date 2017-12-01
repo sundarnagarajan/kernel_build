@@ -1,19 +1,18 @@
 #!/bin/bash
-# Path to config file relative to dir with this script
-CONFIG_FILE=./config.kernel
-# Patch file path relative to dir with this script
-# All patches expected to be in one file
-PATCH_FILE=./all_patches.patch
-# KERNEL_SOURCE_SCRIPT should be in current dir and echo URL of kernel source
-KERNEL_SOURCE_SCRIPT=./get_kernel_source_url.py
-SHOW_AVAIL_KERNELS_SCRIPT=./show_available_kernels.py
-UPDATE_CONFIG_SCRIPT=./update_kernel_config.py
-CHECK_REQD_PKGS_SCRIPT=./required_pkgs.sh
-IMAGE_NAME=bzImage
+#-------------------------------------------------------------------------
+# Following are plain filenames - expected in same dir as this script
+#-------------------------------------------------------------------------
+# Kernel config file - unless KERNEL_CONFIG env var is set
+# Can be overridden by KERNEL_CONFIG env var
+CONFIG_FILE=config.kernel
+
+# Patch file - all patches expected to be in one file
+# Can be overridden by KERNEL_PATCHES env var
+PATCH_FILE=all_patches.patch
 
 #-------------------------------------------------------------------------
-# Following are plain filenames - will be created in KERNEL_BUILD_DIR
-# or current dir if KERNEL_BUILD_DIR/debs if KERNEL_BUILD_DIR is not set
+# Following are debug outputs - will be created in DEB_DIR
+# Filenames cannot be overridden by environment vars
 #-------------------------------------------------------------------------
 # Output of build_kernel (ONLY)
 COMPILE_OUT_FILENAME=compile.out
@@ -21,57 +20,44 @@ COMPILE_OUT_FILENAME=compile.out
 SILENTCONFIG_OUT_FILENAME=silentconfig.out
 # Output of ANSWER_QUESTIONS_SCRIPT - answers chosen
 CHOSEN_OUT_FILENAME=chosen.out
+# File containing time taken for different steps
+START_END_TIME_FILE=start_end.out
+
+#-------------------------------------------------------------------------
+# Following are requried scripts - must be in same dir as this script
+# Cannot be overridden by environment vars
+#-------------------------------------------------------------------------
+KERNEL_SOURCE_SCRIPT=get_kernel_source_url.py
+SHOW_AVAIL_KERNELS_SCRIPT=show_available_kernels.py
+UPDATE_CONFIG_SCRIPT=update_kernel_config.py
+CHECK_REQD_PKGS_SCRIPT=required_pkgs.sh
+
+# Kernel image build target
+IMAGE_NAME=bzImage
 
 #-------------------------------------------------------------------------
 # Probably don't have to change anything below this
 #-------------------------------------------------------------------------
 
-CURDIR=$(printf %q "$(readlink -f $PWD)")
-
-if [ "$1" = "-h" -o "$1" = "--help" ]; then
-    if [ -f "${CURDIR}/README" ]; then
-        cat "${CURDIR}/README"
-        exit 0
-    fi
-fi
-
-
-COMPILE_OUT_FILENAME=$(basename "$COMPILE_OUT_FILENAME")
-SILENTCONFIG_OUT_FILENAME=$(basename "$SILENTCONFIG_OUT_FILENAME")
-CHOSEN_OUT_FILENAME=$(basename "$CHOSEN_OUT_FILENAME")
-
-CHECK_REQD_PKGS_SCRIPT=$(printf %q "${CURDIR}/${CHECK_REQD_PKGS_SCRIPT}")
-KERNEL_SOURCE_SCRIPT=$(printf %q "${CURDIR}/${KERNEL_SOURCE_SCRIPT}")
-SHOW_AVAIL_KERNELS_SCRIPT=$(printf %q "${CURDIR}/${SHOW_AVAIL_KERNELS_SCRIPT}")
-UPDATE_CONFIG_SCRIPT=$(printf %q "${CURDIR}/${UPDATE_CONFIG_SCRIPT}")
-if [ -z "$NUM_THREADS" ]; then
-    NUM_THREADS=$(lscpu | grep '^CPU(s)' | awk '{print $2}')
-fi
-printf "Using %d threads\n" $NUM_THREADS
-MAKE_THREADED="make -j$NUM_THREADS"
-INDENT="    "
-CONFIG_FILE_PATH="${CURDIR}/${CONFIG_FILE}"
-if [ -n "$KERNEL_CONFIG" ]; then
-    if [ -f "$KERNEL_CONFIG" ] ; then
-        CONFIG_FILE_PATH="${KERNEL_CONFIG}"
-        echo "Using config from environment: ${KERNEL_CONFIG}"
-    else
-        echo "Ignoring non-existent config from environment: ${KERNEL_CONFIG}"
-    fi
-fi
-if [ -z "$KERNEL_CONFIG_PREFS" ]; then
-    KERNEL_CONFIG_PREFS="${CURDIR}/config.prefs"
-fi
-
-$CHECK_REQD_PKGS_SCRIPT
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
+SCRIPT_DIR=$(printf "%q" $(readlink -f $(dirname $0)))
 
 #-------------------------------------------------------------------------
 # functions
 #-------------------------------------------------------------------------
+function show_help {
+    # If pandoc is available, use it to convert README.md to text
+    which pandoc 1>/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        pandoc -r markdown_github -w plain "${SCRIPT_DIR}/README.md"
+    fi
+    # No pandoc
+    if [ -f "${SCRIPT_DIR}/README" ]; then
+        cat "${SCRIPT_DIR}/README"
+    else
+        cat "${SCRIPT_DIR}/README.md"
+    fi
+}
+
 function choose_deb_dir {
     # If KERNEL_BUILD_DIR env var is set, set DEB_DIR to that dir
     # All components of KERNEL_BUILD_DIR except last component must already exist
@@ -80,6 +66,7 @@ function choose_deb_dir {
     # except last component do not exist, DEB_DIR is set to 
     # ${CURDIR}/debs
 
+    CURDIR=$(printf %q "$(readlink -f $PWD)")
     unset DEB_DIR
     if [ -n "${KERNEL_BUILD_DIR}" ]; then
         KERNEL_BUILD_DIR=$(readlink -f "${KERNEL_BUILD_DIR}")
@@ -112,7 +99,7 @@ function choose_deb_dir {
                 fi
             fi
             DEB_DIR="${KERNEL_BUILD_DIR}"
-            echo "Building in: ${KERNEL_BUILD_DIR}"
+            printf "%-24s : %s\n" "Building in" "${KERNEL_BUILD_DIR}"
         else
             echo "Parent directory does not exist: ${BUILD_DIR_PARENT}"
             echo "Ignoring KERNEL_BUILD_DIR: ${KERNEL_BUILD_DIR}"
@@ -124,6 +111,109 @@ function choose_deb_dir {
         rm -rf "${DEB_DIR}"
         mkdir "${DEB_DIR}"
     fi
+}
+
+function set_vars {
+    #-------------------------------------------------------------------------
+    # Strip off directory path components if we expect only filenames
+    #-------------------------------------------------------------------------
+    CONFIG_FILE=$(basename "$CONFIG_FILE")
+    PATCH_FILE=$(basename "$PATCH_FILE")
+
+    KERNEL_SOURCE_SCRIPT=$(basename "$KERNEL_SOURCE_SCRIPT")
+    SHOW_AVAIL_KERNELS_SCRIPT=$(basename "$SHOW_AVAIL_KERNELS_SCRIPT")
+    UPDATE_CONFIG_SCRIPT=$(basename "$UPDATE_CONFIG_SCRIPT")
+    CHECK_REQD_PKGS_SCRIPT=$(basename "$CHECK_REQD_PKGS_SCRIPT")
+
+    COMPILE_OUT_FILENAME=$(basename "$COMPILE_OUT_FILENAME")
+    SILENTCONFIG_OUT_FILENAME=$(basename "$SILENTCONFIG_OUT_FILENAME")
+    CHOSEN_OUT_FILENAME=$(basename "$CHOSEN_OUT_FILENAME")
+    START_END_TIME_FILE=$(basename "$START_END_TIME_FILE")
+
+    # Required scripts can ONLY be in the same dir as this script
+    KERNEL_SOURCE_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${KERNEL_SOURCE_SCRIPT}")
+    SHOW_AVAIL_KERNELS_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${SHOW_AVAIL_KERNELS_SCRIPT}")
+    UPDATE_CONFIG_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${UPDATE_CONFIG_SCRIPT}")
+    CHECK_REQD_PKGS_SCRIPT=$(printf "%q" "${SCRIPT_DIR}/${CHECK_REQD_PKGS_SCRIPT}")
+
+    # DEB_DIR set in separate function because it has more complex logic
+    choose_deb_dir
+
+    # Debug outputs are always in DEB_DIR
+    SILENTCONFIG_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}")
+    CHOSEN_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${CHOSEN_OUT_FILENAME}")
+    COMPILE_OUT_FILEPATH=$(printf "%q" "${DEB_DIR}/${COMPILE_OUT_FILENAME}")
+    START_END_TIME_FILEPATH=$(printf "%q" "${DEB_DIR}/$START_END_TIME_FILE")
+
+    # CONFIG_FILE, PATCH_FILE and KERNEL_CONFIG_PREFS can be overridden by
+    #  environment variables
+    CONFIG_FILE_PATH="${SCRIPT_DIR}/${CONFIG_FILE}"
+    if [ -n "$KERNEL_CONFIG" ]; then
+        KERNEL_CONFIG=$(readlink -f "${KERNEL_CONFIG}")
+        if [ -f "$KERNEL_CONFIG" ] ; then
+            CONFIG_FILE_PATH="${KERNEL_CONFIG}"
+        else
+            echo "Non-existent config : ${KERNEL_CONFIG}"
+            exit 1
+        fi
+    fi
+    PATCH_FILE_PATH="${SCRIPT_DIR}/${PATCH_FILE}"
+    if [ -n "${KERNEL_PATCHES}" ]; then
+        KERNEL_PATCHES=$(readlink -f "${KERNEL_PATCHES}")
+        if [ -f "${KERNEL_PATCHES}" ] ; then
+            PATCH_FILE_PATH="${KERNEL_PATCHES}"
+        else
+            echo "Ignoring non-existent patch file : ${KERNEL_PATCHES}"
+            unset PATCH_FILE_PATH
+        fi
+    fi
+    if [ -n "${KERNEL_CONFIG_PREFS}" ]; then
+        KERNEL_CONFIG_PREFS=$(readlink -f "${KERNEL_CONFIG_PREFS}")
+        if [ ! -f "${KERNEL_CONFIG_PREFS}" ] ; then
+            echo "Ignoring non-existent config prefs : ${KERNEL_CONFIG_PREFS}"
+            unset KERNEL_CONFIG_PREFS
+        fi
+    else
+        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/config.prefs"
+    fi
+
+    # Fix NUM_THREADS to be min(NUM_THREADS, number_of_cores)
+    local NUM_CORES=$(lscpu | grep '^CPU(s)' | awk '{print $2}')
+    local TARGETED_CORES=$(($NUM_CORES - 1))
+    if [ $TARGETED_CORES -lt 1 ]; then
+        TARGETED_CORES=1
+    fi
+
+    if [ -n "$NUM_THREADS" ]; then
+        echo "$NUM_THREADS" | grep -q '^[1-9][0-9]*$'
+        if [ $? -eq 0 ]; then
+            if [ $NUM_THREADS -gt $TARGETED_CORES ]; then
+                echo "Ignoring NUM_THREADS > (available cores - 1) ($TARGETED_CORES)"
+                unset NUM_THREADS
+            fi
+        else
+            echo "Ignoring invalid value for NUM_THREADS : $NUM_THREADS"
+            unset NUM_THREADS
+        fi
+    fi
+    if [ -z "$NUM_THREADS" ]; then
+        NUM_THREADS=$TARGETED_CORES
+    fi
+
+    MAKE_THREADED="make -j$NUM_THREADS"
+    INDENT="    "
+
+    # Print what we are using
+    printf "%-24s : %s\n" "Config file" "${CONFIG_FILE_PATH}"
+    printf "%-24s : %s\n" "Patch file" "${PATCH_FILE_PATH}"
+    printf "%-24s : %s\n" "Config prefs" "${KERNEL_CONFIG_PREFS}"
+    printf "%-24s : %s\n" "Threads" "${NUM_THREADS}"
+    printf "%-24s : %s\n" "DEBS built in" "${DEB_DIR}"
+    printf "%-24s : %s\n" "silentoldconfig output" "$SILENTCONFIG_OUT_FILEPATH"
+    printf "%-24s : %s\n" "Config choices output" "$CHOSEN_OUT_FILEPATH"
+    printf "%-24s : %s\n" "Build output" "$COMPILE_OUT_FILEPATH"
+
+
 }
 
 function get_hms {
@@ -143,15 +233,15 @@ function show_timing_msg {
     # $3 (optional): elapsed time (string)
     if [ "$2" = "yestee" ]; then
         if [ -n "$3" ]; then
-            printf "%-39s: %-28s (%s)\n" "$1" "$(date)" "$3" | tee -a "$START_END_TIME_FILE"
+            printf "%-39s: %-28s (%s)\n" "$1" "$(date)" "$3" | tee -a "$START_END_TIME_FILEPATH"
         else
-            printf "%-39s: %-28s\n" "$1" "$(date)" | tee -a "$START_END_TIME_FILE"
+            printf "%-39s: %-28s\n" "$1" "$(date)" | tee -a "$START_END_TIME_FILEPATH"
         fi
     else
         if [ -n "$3" ]; then
-            printf "%-39s: %-28s (%s)\n" "$1" "$(date)" "$3" >> "$START_END_TIME_FILE"
+            printf "%-39s: %-28s (%s)\n" "$1" "$(date)" "$3" >> "$START_END_TIME_FILEPATH"
         else
-            printf "%-39s: %-28s\n" "$1" "$(date)" >> "$START_END_TIME_FILE"
+            printf "%-39s: %-28s\n" "$1" "$(date)" >> "$START_END_TIME_FILEPATH"
         fi
     fi
 }
@@ -246,12 +336,12 @@ function kernel_version()
 function set_build_dir {
     # Check there is exactly one dir extracted - we depend on this
     cd "${DEB_DIR}"
-    if [ $(ls -1 | fgrep -v $(basename $(printf "%q" ${START_END_TIME_FILE})) | wc -l) -ne 1 ]; then
+    if [ $(ls -1 | fgrep -v $(basename ${START_END_TIME_FILE}) | wc -l) -ne 1 ]; then
         echo "Multiple top-level dir extracted - almost certainly wrong"
         exit 1
     fi
     BUILD_DIR=$(printf %q "${DEB_DIR}/$(ls | head -1)")
-    cd "${CURDIR}"
+    cd "${SCRIPT_DIR}"
 
     if [ ! -d "$BUILD_DIR" ]; then
         echo "Directory not found: BUILD_DIR: $BUILD_DIR"
@@ -267,11 +357,11 @@ function set_build_dir {
 }
 
 function apply_patches {
-    if [ -n "$PATCH_FILE" ]; then
-        if [ -f "${CURDIR}/${PATCH_FILE}" ]; then
-            echo "Applying patches from ${CURDIR}/${PATCH_FILE}"
+    if [ -n "$PATCH_FILE_PATH" ]; then
+        if [ -f "${PATCH_FILE_PATH}" ]; then
+            echo "Applying patches from ${PATCH_FILE_PATH}"
             cd "${BUILD_DIR}"
-            patch -p1 < "${CURDIR}/${PATCH_FILE}" 2>&1 | sed -e "s/^/${INDENT}/"
+            patch -p1 < "${PATCH_FILE_PATH}" 2>&1 | sed -e "s/^/${INDENT}/"
             if [ $? -ne 0 ]; then
                 echo "Patch failed" | sed -e "s/^/${INDENT}/"
                 exit 1
@@ -333,13 +423,11 @@ function run_make_silentoldconfig {
         echo "Not executable: $UPDATE_CONFIG_SCRIPT"
         exit 1
     fi
-    local SILENTCONFIG_OUT_FILE="${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}"
-    local CHOSEN_OUT_FILE="${DEB_DIR}/${CHOSEN_OUT_FILENAME}"
     local MAKE_CONFIG_CMD="make silentoldconfig"
     
     OLD_DIR=$(pwd)
     cd "${BUILD_DIR}"
-    PYTHONUNBUFFERED=yes $UPDATE_CONFIG_SCRIPT "${BUILD_DIR}" "${SILENTCONFIG_OUT_FILE}" "${CHOSEN_OUT_FILE}" "${MAKE_CONFIG_CMD}" "${KERNEL_CONFIG_PREFS}"
+    PYTHONUNBUFFERED=yes $UPDATE_CONFIG_SCRIPT "${BUILD_DIR}" "${SILENTCONFIG_OUT_FILEPATH}" "${CHOSEN_OUT_FILEPATH}" "${MAKE_CONFIG_CMD}" "${KERNEL_CONFIG_PREFS}"
     ret=$?
 
     cd "$OLD_DIR"
@@ -348,45 +436,50 @@ function run_make_silentoldconfig {
 
 function build_kernel {
     SECONDS=0
-    local COMPILE_OUT_FILE="${DEB_DIR}/${COMPILE_OUT_FILENAME}"
-    \cp -f /dev/null "${COMPILE_OUT_FILE}"
+    \cp -f /dev/null "${COMPILE_OUT_FILEPATH}"
     local elapsed=''
 
     show_timing_msg "Kernel build start" "yestee" ""
     run_make_silentoldconfig
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILE}"; echo ""; echo "See ${COMPILE_OUT_FILE}"; exit 1)
-    $MAKE_THREADED $IMAGE_NAME 1>>"${COMPILE_OUT_FILE}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILE}"; echo ""; echo "See ${COMPILE_OUT_FILE}"; exit 1)
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
+    $MAKE_THREADED $IMAGE_NAME 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
     show_timing_msg "Kernel $IMAGE_NAME build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel modules build start" "notee" ""; SECONDS=0
-    $MAKE_THREADED modules 1>>"${COMPILE_OUT_FILE}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILE}"; echo ""; echo "See ${COMPILE_OUT_FILE}"; exit 1)
+    $MAKE_THREADED modules 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
     show_timing_msg "Kernel modules build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel deb build start" "notee" ""; SECONDS=0
-    $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILE}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILE}"; echo ""; echo "See ${COMPILE_OUT_FILE}"; exit 1)
+    $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}"; exit 1)
 
     show_timing_msg "Kernel deb build finished" "yestee" "$(get_hms)"
     show_timing_msg "Kernel build finished" "notee" ""
 
     echo "-------------------------- Kernel compile time -------------------------------"
-    cat $START_END_TIME_FILE
+    cat $START_END_TIME_FILEPATH
     echo "------------------------------------------------------------------------------"
     echo "Kernel DEBS: (in $(readlink -f $DEB_DIR))"
     cd "${DEB_DIR}"
     ls -1 *.deb | sed -e "s/^/${INDENT}/"
     echo "------------------------------------------------------------------------------"
-    \rm -f "${COMPILE_OUT_FILE}" "${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}" "$START_END_TIME_FILE"
+    \rm -f "${COMPILE_OUT_FILEPATH}" "${DEB_DIR}/${SILENTCONFIG_OUT_FILEPATH}" "$START_END_TIME_FILEPATH"
 }
 
 #-------------------------------------------------------------------------
 # Actual build steps after this
 #-------------------------------------------------------------------------
-choose_deb_dir
-START_END_TIME_FILE="${DEB_DIR}/start_end.out"
-rm -f "$START_END_TIME_FILE"
+if [ "$1" = "-h" -o "$1" = "--help" ]; then
+    show_help
+    exit 0
+fi
+set_vars
+$CHECK_REQD_PKGS_SCRIPT | exit 1
+
+
+rm -f "$START_END_TIME_FILEPATH"
 # Show available kernels and kernel version of available config
 if [ -x "${SHOW_AVAIL_KERNELS_SCRIPT}" ]; then
     $SHOW_AVAIL_KERNELS_SCRIPT
