@@ -88,11 +88,11 @@ that looks like:
         case "${KERNEL_BUILD_DIR}" in
                 *\ * )
                     echo "$BAD_DIR_MSG"
-                    exit 1
+                    return 1
                     ;;
                 *:* )
                     echo "$BAD_DIR_MSG"
-                    exit 1
+                    return 1
                     ;;
         esac
 
@@ -104,25 +104,25 @@ that looks like:
                     \rm -f "${KERNEL_BUILD_DIR}"
                     if [ $? -ne 0 ]; then
                         echo "Could not delete non-directory ${KERNEL_BUILD_DIR}"
-                        exit 1
+                        return 1
                     fi
                     mkdir -p "${KERNEL_BUILD_DIR}"
                     if [ $? -ne 0 ]; then
                         echo "Could not create ${KERNEL_BUILD_DIR}"
-                        exit 1
+                        return 1
                     fi
                 else    # KERNEL_BUILD_DIR is an existing dir
                     find "${KERNEL_BUILD_DIR}" -mindepth 1 -delete
                     if [ $? -ne 0 ]; then
                         echo "Could not empty ${KERNEL_BUILD_DIR}"
-                        exit 1
+                        return 1
                     fi
                 fi
             else
                 mkdir -p "${KERNEL_BUILD_DIR}"
                 if [ $? -ne 0 ]; then
                     echo "Could not create ${KERNEL_BUILD_DIR}"
-                    exit 1
+                    return 1
                 fi
             fi
             DEB_DIR="${KERNEL_BUILD_DIR}"
@@ -138,11 +138,11 @@ that looks like:
         case "${KERNEL_BUILD_DIR}" in
                 *\ * )
                     echo "$BAD_DIR_MSG"
-                    exit 1
+                    return 1
                     ;;
                 *:* )
                     echo "$BAD_DIR_MSG"
-                    exit 1
+                    return 1
                     ;;
         esac
         rm -rf "${DEB_DIR}"
@@ -191,7 +191,7 @@ function set_vars {
             CONFIG_FILE_PATH="${KERNEL_CONFIG}"
         else
             echo "Non-existent config : ${KERNEL_CONFIG}"
-            exit 1
+            return 1
         fi
     fi
     PATCH_DIR_PATH="${SCRIPT_DIR}/${PATCH_DIR}"
@@ -305,7 +305,7 @@ function get_tar_fmt_ind {
 			;;
 		*)
 			echo "KERNEL_SRC has unknown suffix ${SUFFIX}: ${URL}"
-			exit 1
+			return 1
 			;;
 	esac
 }
@@ -317,14 +317,14 @@ function get_kernel_source {
     # Retrieve and extract kernel source
     if [ ! -x "${KERNEL_SOURCE_SCRIPT}" ]; then
         echo "Kernel source script not found: ${KERNEL_SOURCE_SCRIPT}"
-        exit 1
+        return 1
     fi
     local KERNEL_SOURCE_URL="$(${KERNEL_SOURCE_SCRIPT})"
     # Check URL is OK:
     curl -s -f -I "$KERNEL_SOURCE_URL" 1>/dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo "URL not accessible: $KERNEL_SOURCE_URL"
-        exit 1
+        return 1
     fi
     local TAR_FMT_IND=$(get_tar_fmt_ind "$KERNEL_SOURCE_URL")
     wget -q -O - -nd "$KERNEL_SOURCE_URL" | tar "${TAR_FMT_IND}xf" - -C "${DEB_DIR}"
@@ -378,19 +378,19 @@ function set_build_dir {
     cd "${DEB_DIR}"
     if [ $(ls -1 | fgrep -v $(basename ${START_END_TIME_FILE}) | wc -l) -ne 1 ]; then
         echo "Multiple top-level dir extracted - almost certainly wrong"
-        exit 1
+        return 1
     fi
     BUILD_DIR=$(echo "${DEB_DIR}/$(ls | head -1)")
     cd "${SCRIPT_DIR}"
 
     if [ ! -d "$BUILD_DIR" ]; then
         echo "Directory not found: BUILD_DIR: $BUILD_DIR"
-        exit 1
+        return 1
     fi
     local KERN_VER=$(kernel_version "${BUILD_DIR}")
     if [ $? -ne 0 ]; then
         echo "Does not look like linux kernel source"
-        exit 1
+        return 1
     fi
 
     echo "Building kernel $KERN_VER in ${BUILD_DIR}"
@@ -413,11 +413,12 @@ function apply_patches {
     do
         local base_patch_file=$(basename "$patch_file")
         local opt_stripped=$(basename "$patch_file" .optional)
-        local mandatory=0
-        if [ "$patch_file" = "$opt_stripped" ]; then
-            mandatory=1
+        local mandatory=1
+        if [ "$base_patch_file" = "${opt_stripped}.optional" ]; then
+            mandatory=0
         fi
-        local patch_out=$(patch --forward -r - -p1 < $patch_file)
+        local patch_out=$(patch --forward --dry-run -r - -p1 < $patch_file)
+        patch --forward -r - -p1 < $patch_file
         patch_ret=$?
         if [ $mandatory -eq 0 ]; then
             echo "Applying optional patch: $base_patch_file:"
@@ -427,7 +428,7 @@ function apply_patches {
         echo "$patch_out" | sed -e "s/^/${INDENT}/"
         if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
             echo "Mandatory patch failed"
-            exit 1
+            return 1
         fi
     done
 }
@@ -446,7 +447,7 @@ function restore_kernel_config {
             fi
         else
             echo ".config not found: ${CONFIG_FILE_PATH}"
-            exit 1
+            return 1
         fi
     fi
 }
@@ -467,23 +468,23 @@ function run_make_silentoldconfig {
     # $ANSWER_QUESTIONS_SCRIPT
     if [ -z "$BUILD_DIR" ]; then
         echo "BUILD_DIR not set"
-        exit 1
+        return 1
     fi
     if [ ! -d "$BUILD_DIR" ]; then
         echo "BUILD_DIR is not a directory: $BUILD_DIR"
-        exit 1
+        return 1
     fi
     if [ ! -f "${BUILD_DIR}/.config" ]; then
         echo ".config not found: ${BUILD_DIR}/.config"
-        exit 1
+        return 1
     fi
     if [ -z "$UPDATE_CONFIG_SCRIPT" ]; then
         echo "UPDATE_CONFIG_SCRIPT not set"
-        exit 1
+        return 1
     fi
     if [ ! -x "$UPDATE_CONFIG_SCRIPT" ]; then
         echo "Not executable: $UPDATE_CONFIG_SCRIPT"
-        exit 1
+        return 1
     fi
     local MAKE_CONFIG_CMD="make silentoldconfig"
     
@@ -503,19 +504,19 @@ function build_kernel {
 
     show_timing_msg "Kernel build start" "yestee" ""
     run_make_silentoldconfig
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && return 1
     $MAKE_THREADED $IMAGE_NAME 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && return 1
     show_timing_msg "Kernel $IMAGE_NAME build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel modules build start" "notee" ""; SECONDS=0
     $MAKE_THREADED modules 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && return 1
     show_timing_msg "Kernel modules build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel deb build start" "notee" ""; SECONDS=0
     $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && exit 1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && return 1
 
     show_timing_msg "Kernel deb build finished" "yestee" "$(get_hms)"
     show_timing_msg "Kernel build finished" "notee" ""
@@ -547,8 +548,8 @@ if [ -x "${SHOW_AVAIL_KERNELS_SCRIPT}" ]; then
     $SHOW_AVAIL_KERNELS_SCRIPT
 fi
     
-get_kernel_source
-set_build_dir
-apply_patches
-restore_kernel_config
-build_kernel
+get_kernel_source || exit 1
+set_build_dir || exit 1
+apply_patches || exit 1
+restore_kernel_config || exit 1
+build_kernel || exit 1
