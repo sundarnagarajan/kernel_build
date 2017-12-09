@@ -64,13 +64,24 @@ KERNEL_CONFIG_PREFS
     patch_and_build_kernel.sh is used
 -   If env var is set and invalid, no config prefs are applied
 
-KERNEL_PATCHES
+KERNEL_PATCH_DIR
 
--   FULL path to file containing kernel patches (all patches in a
-    single file)
--   If env var not set, allpatches.patch in the same dir as
+-   FULL Path to dir containing kernel patches
+-   If env var not set, 'patches' directory in the same dir as
     patch_and_build_kernel.sh is used
 -   If env var is set and invalid, no patches are applied
+-   Each file in directory can contain one or more patches
+-   Patches are applied in file (lexicographic order)
+-   Patch files could be named starting with '001_', '002_' ... to
+    visiually indicate patch order, but this is not required. Patches
+    are applied by considering patch files in order as listed by 'for i
+    in *'
+-   Patch filenames ending in '.optional' are applied if possible.
+    Failures are ignored
+-   Patch filenames NOT ending in '.optional' are considered mandatory.
+    Kernel build FAILS if patch does not apply.
+-   Mandatory patch files can end in '.patch', although this is not
+    required
 
 config.prefs or KERNEL_CONFIG_PREFS format:
 

@@ -6,9 +6,15 @@
 # Can be overridden by KERNEL_CONFIG env var
 CONFIG_FILE=config.kernel
 
-# Patch file - all patches expected to be in one file
-# Can be overridden by KERNEL_PATCHES env var
-PATCH_FILE=all_patches.patch
+# Patch directory - all patches are expected to be in files in this dir
+# Can be overridden by KERNEL_PATCH_DIR env var
+# - Each file in directory can contain one or more patches
+# - Patches are applied in file (lexicographic order)
+# - Patch filenames ending in '.optional' are applied if possible.
+#   Failures are ignored
+# - Patch filenames NOT ending in '.optional' are considered mandatory.
+#   Kernel build FAILS if patch does not apply.
+PATCH_DIR=patches
 
 #-------------------------------------------------------------------------
 # Following are debug outputs - will be created in DEB_DIR
@@ -149,7 +155,7 @@ function set_vars {
     # Strip off directory path components if we expect only filenames
     #-------------------------------------------------------------------------
     CONFIG_FILE=$(basename "$CONFIG_FILE")
-    PATCH_FILE=$(basename "$PATCH_FILE")
+    PATCH_DIR=$(basename "$PATCH_DIR")
 
     KERNEL_SOURCE_SCRIPT=$(basename "$KERNEL_SOURCE_SCRIPT")
     SHOW_AVAIL_KERNELS_SCRIPT=$(basename "$SHOW_AVAIL_KERNELS_SCRIPT")
@@ -176,7 +182,7 @@ function set_vars {
     COMPILE_OUT_FILEPATH="${DEB_DIR}/${COMPILE_OUT_FILENAME}"
     START_END_TIME_FILEPATH="${DEB_DIR}/$START_END_TIME_FILE"
 
-    # CONFIG_FILE, PATCH_FILE and KERNEL_CONFIG_PREFS can be overridden by
+    # CONFIG_FILE, PATCH_DIR and KERNEL_CONFIG_PREFS can be overridden by
     #  environment variables
     CONFIG_FILE_PATH="${SCRIPT_DIR}/${CONFIG_FILE}"
     if [ -n "$KERNEL_CONFIG" ]; then
@@ -188,14 +194,14 @@ function set_vars {
             exit 1
         fi
     fi
-    PATCH_FILE_PATH="${SCRIPT_DIR}/${PATCH_FILE}"
-    if [ -n "${KERNEL_PATCHES}" ]; then
-        KERNEL_PATCHES=$(readlink -f "${KERNEL_PATCHES}")
-        if [ -f "${KERNEL_PATCHES}" ] ; then
-            PATCH_FILE_PATH="${KERNEL_PATCHES}"
+    PATCH_DIR_PATH="${SCRIPT_DIR}/${PATCH_DIR}"
+    if [ -n "${KERNEL_PATCH_DIR}" ]; then
+        KERNEL_PATCH_DIR=$(readlink -f "${KERNEL_PATCH_DIR}")
+        if [ -d "${KERNEL_PATCH_DIR}" ] ; then
+            PATCH_DIR_PATH="${KERNEL_PATCH_DIR}"
         else
-            echo "Ignoring non-existent patch file : ${KERNEL_PATCHES}"
-            unset PATCH_FILE_PATH
+            echo "Ignoring non-existent patch directory : ${KERNEL_PATCH_DIR}"
+            unset PATCH_DIR_PATH
         fi
     fi
     if [ -n "${KERNEL_CONFIG_PREFS}" ]; then
@@ -236,7 +242,7 @@ function set_vars {
 
     # Print what we are using
     printf "%-24s : %s\n" "Config file" "${CONFIG_FILE_PATH}"
-    printf "%-24s : %s\n" "Patch file" "${PATCH_FILE_PATH}"
+    printf "%-24s : %s\n" "Patch dir" "${PATCH_DIR_PATH}"
     printf "%-24s : %s\n" "Config prefs" "${KERNEL_CONFIG_PREFS}"
     printf "%-24s : %s\n" "Threads" "${NUM_THREADS}"
     printf "%-24s : %s\n" "DEBS built in" "${DEB_DIR}"
@@ -391,17 +397,39 @@ function set_build_dir {
 }
 
 function apply_patches {
-    if [ -n "$PATCH_FILE_PATH" ]; then
-        if [ -f "${PATCH_FILE_PATH}" ]; then
-            echo "Applying patches from ${PATCH_FILE_PATH}"
-            cd "${BUILD_DIR}"
-            patch -p1 < "${PATCH_FILE_PATH}" 2>&1 | sed -e "s/^/${INDENT}/"
-            if [ $? -ne 0 ]; then
-                echo "Patch failed" | sed -e "s/^/${INDENT}/"
-                exit 1
-            fi
-        fi
+    if [ -z "$PATCH_DIR_PATH" ]; then
+        echo "Patch directory not set. Not applying any patches"
+        return
     fi
+    local num_patches=$(ls -1 "$PATCH_DIR_PATH"/ | wc -l)
+    if [ $num_patches -eq 0 ]; then
+        echo "No patches to apply"
+        return
+    fi
+    echo "Number of patches to apply: $num_patches"
+    cd "${BUILD_DIR}"
+
+    ls -1 "$PATCH_DIR_PATH"/* | while read patch_file
+    do
+        local base_patch_file=$(basename "$patch_file")
+        local opt_stripped=$(basename "$patch_file" .optional)
+        local mandatory=0
+        if [ "$patch_file" = "$opt_stripped" ]; then
+            mandatory=1
+        fi
+        local patch_out=$(patch --forward -r - -p1 < $patch_file)
+        patch_ret=$?
+        if [ $mandatory -eq 0 ]; then
+            echo "Applying optional patch: $base_patch_file:"
+        else
+            echo "Applying mandatory patch: $base_patch_file:"
+        fi
+        echo "$patch_out" | sed -e "s/^/${INDENT}/"
+        if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
+            echo "Mandatory patch failed"
+            exit 1
+        fi
+    done
 }
 
 function restore_kernel_config {
