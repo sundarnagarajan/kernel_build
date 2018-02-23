@@ -174,6 +174,10 @@ function read_config {
     else
         echo "Ignoring missing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
     fi
+    
+    # Some variables need to be EXPORTED
+    export DEBEMAIL
+    export DEBFULLNAME
 }
 
 function set_vars {
