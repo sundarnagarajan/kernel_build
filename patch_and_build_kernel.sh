@@ -150,6 +150,32 @@ that looks like:
     fi
 }
 
+function read_config {
+    #-------------------------------------------------------------------------
+    # Use KBUILD_CONFIG to get environment variables
+    # Use KERNEL_BUILD_CONFIG if set to choose config file - defaults to
+    # ~/.kernel_build.config
+    #-------------------------------------------------------------------------
+    KBUILD_CONFIG=~/.kernel_build.config
+
+    if [ -n "$KERNEL_BUILD_CONFIG" ]; then
+        KBUILD_CONFIG=$KERNEL_BUILD_CONFIG
+    fi
+    if [ -f "$KBUILD_CONFIG" ]; then
+        if [ -r "$KBUILD_CONFIG" ]; then
+            . "$KBUILD_CONFIG"
+            if [ $? -ne 0 ]; then
+                echo "Error sourcing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+                return 1
+            fi
+        else
+            echo "Ignoring unreadable KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+        fi
+    else
+        echo "Ignoring missing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+    fi
+}
+
 function set_vars {
     #-------------------------------------------------------------------------
     # Strip off directory path components if we expect only filenames
@@ -173,6 +199,7 @@ function set_vars {
     UPDATE_CONFIG_SCRIPT="${SCRIPT_DIR}/${UPDATE_CONFIG_SCRIPT}"
     CHECK_REQD_PKGS_SCRIPT="${SCRIPT_DIR}/${CHECK_REQD_PKGS_SCRIPT}"
 
+    read_config
     # DEB_DIR set in separate function because it has more complex logic
     choose_deb_dir
 
@@ -240,17 +267,27 @@ function set_vars {
     MAKE_THREADED="make -j$NUM_THREADS"
     INDENT="    "
 
+    # Kernel build target - defaults to deb-pkg - source + binary
+    # but can set KERNEL__NO_SRC_PKG environment variable to choose
+    # to build binary only. If only binary deb is built, it cannot
+    # be uploaded to Launchpad PPA, but can be uploaded to bintray
+
+    KERNEL_BUILD_TARGET=deb-pkg
+    if [ -n "$KERNEL__NO_SRC_PKG" ]; then
+        KERNEL_BUILD_TARGET=bindeb-pkg
+    fi
+
+
     # Print what we are using
     printf "%-24s : %s\n" "Config file" "${CONFIG_FILE_PATH}"
     printf "%-24s : %s\n" "Patch dir" "${PATCH_DIR_PATH}"
     printf "%-24s : %s\n" "Config prefs" "${KERNEL_CONFIG_PREFS}"
     printf "%-24s : %s\n" "Threads" "${NUM_THREADS}"
+    printf "%-24s : %s\n" "Build target" "${KERNEL_BUILD_TARGET}"
     printf "%-24s : %s\n" "DEBS built in" "${DEB_DIR}"
     printf "%-24s : %s\n" "silentoldconfig output" "$SILENTCONFIG_OUT_FILEPATH"
     printf "%-24s : %s\n" "Config choices output" "$CHOSEN_OUT_FILEPATH"
     printf "%-24s : %s\n" "Build output" "$COMPILE_OUT_FILEPATH"
-
-
 }
 
 function get_hms {
@@ -319,7 +356,8 @@ function get_kernel_source {
         echo "Kernel source script not found: ${KERNEL_SOURCE_SCRIPT}"
         return 1
     fi
-    local KERNEL_SOURCE_URL="$(${KERNEL_SOURCE_SCRIPT})"
+    # Make KERNEL_SOURCE_URL global, so we can add to Changelog
+    KERNEL_SOURCE_URL="$(${KERNEL_SOURCE_SCRIPT})"
     # Check URL is OK:
     curl -s -f -I "$KERNEL_SOURCE_URL" 1>/dev/null 2>&1
     if [ $? -ne 0 ]; then
@@ -515,7 +553,7 @@ function build_kernel {
     show_timing_msg "Kernel modules build finished" "yestee" "$(get_hms)"
 
     show_timing_msg "Kernel deb build start" "notee" ""; SECONDS=0
-    $MAKE_THREADED bindeb-pkg 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    $MAKE_THREADED ${KERNEL_BUILD_TARGET} 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
     [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && return 1
 
     show_timing_msg "Kernel deb build finished" "yestee" "$(get_hms)"
@@ -528,8 +566,10 @@ function build_kernel {
     cd "${DEB_DIR}"
     ls -1 *.deb | sed -e "s/^/${INDENT}/"
     echo "------------------------------------------------------------------------------"
-    \rm -f "${COMPILE_OUT_FILEPATH}" "${DEB_DIR}/${SILENTCONFIG_OUT_FILEPATH}" "$START_END_TIME_FILEPATH"
+
+    rm -f "${DEB_DIR}/${SILENTCONFIG_OUT_FILEPATH}"
 }
+
 
 #-------------------------------------------------------------------------
 # Actual build steps after this
@@ -539,7 +579,7 @@ if [ "$1" = "-h" -o "$1" = "--help" ]; then
     exit 0
 fi
 set_vars
-$CHECK_REQD_PKGS_SCRIPT | exit 1
+$CHECK_REQD_PKGS_SCRIPT || exit 1
 
 
 rm -f "$START_END_TIME_FILEPATH"

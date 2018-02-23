@@ -16,46 +16,13 @@ Download and build Linux kernel source from kernel.org
 - config.prefs in directory where patch_and_build_kernel.sh is can contain name=value pairs that will be applied to the config while building
 
 ### Things that can be changed using environment variables:
-#### KERNEL_TYPE
-- Will filter available kernels
-- IGNORED if it is not a recognized type: latest|mainline|stable|longterm
+See samples/sample_kernel.config for a list of environment variables that can be set, their default values and meanings
 
-#### KERNEL_VERSION
-- Will override version from config file
-- Will filter available kernels
+The additional environment variable KERNEL_BUILD_CONFIG can be set to point at the config file to be sourced - defaults to ~/.kernel_build.config.
 
-#### KERNEL_CONFIG
-- FULL PATH to existing config file
-- Will override config.kernel in this directory
-- If env var is set, file MUST exist
+If you are uploading to bintray, see samples/sample_bintray.config for a list of environment variables that MUST be set for upload to work.
 
-#### KERNEL_BUILD_DIR
-- Overrides current_dir/debs
-- All path components except the last one MUST exist
-- If last path component does not exist, it is created
-- If last path component exists, all files/dirs under that path are DELETED
-
-#### NUM_THREADS
-- Number of threads to use
-- Limited to (available_cores - 1) at most
-- Intended to use to limit to LESS than (available_cores - 1)
-
-#### KERNEL_CONFIG_PREFS 
-- FULL path to file containing name=value pairs that will be applied to the config while building
-- See config.prefs format below
-- If env var not set, config.prefs in the same dir as patch_and_build_kernel.sh is used
-- If env var is set and invalid, no config prefs are applied
-
-#### KERNEL_PATCH_DIR
-- FULL Path to dir containing kernel patches
-- If env var not set, 'patches' directory in the same dir as patch_and_build_kernel.sh is used
-- If env var is set and invalid, no patches are applied
-- Each file in directory can contain one or more patches
-- Patches are applied in file (lexicographic order)
-- Patch files could be named starting with '001\_', '002\_' ... to visiually indicate patch order, but this is not required. Patches are applied by considering patch files in order as listed by 'for i in \*'
-- Patch filenames ending in '.optional' are applied if possible. Failures are ignored
-- Patch filenames **NOT** ending in '.optional' are considered mandatory. Kernel build **FAILS** if patch does not apply.
-- Mandatory patch files can end in '.patch', although this is not required
+The additional environment variable BINTRAY_CONFIG can be set to point at bintray config file to source - defaults to ~/.bintray.config
 
 ### config.prefs or KERNEL_CONFIG_PREFS format:
 - Lines starting with '#' are ignored

@@ -10,7 +10,7 @@
 USB_SERIAL=m
 # Enable staging drivers
 STAGING=y
-# Related to RDP Thinbook
+# Modules for Intel Cherry Trail platform
 RTL8723BS=m
 AXP288_CHARGER=m
 AXP288_FUEL_GAUGE=m

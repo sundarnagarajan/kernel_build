@@ -14,7 +14,7 @@ Usage: update_kernel_config.py <PREFS_FILE> <BUILD_DIR>
 
     command_and_args: Command to call AFTER modifying .config
         Typically:
-        answer_config_questions.py <silent_config_out> make silentoldconfig
+        update_kernel_config.py <silent_config_out> make silentoldconfig
 
     PREFS_FILE - containing kernel config preferences - one per line
 

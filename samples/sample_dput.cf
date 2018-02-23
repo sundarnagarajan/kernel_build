@@ -1,0 +1,17 @@
+# Assume that each section names a PPA within a single Launchpad account
+# The entries in the DEFAULT section can be overridden in the individual
+# PPA sections
+
+[DEFAULT]
+fqdn = ppa.launchpad.net
+method = sftp
+# login is your launchpad login
+login = my_launchpad_login
+allow_unsigned_uploads = 1
+
+
+[my_ppa_1]
+incoming = ~my_launchpad_login/ubuntu/my_ppa_1/
+
+[my_ppa_2]
+incoming = ~my_launchpad_login/ubuntu/my_ppa_2/
