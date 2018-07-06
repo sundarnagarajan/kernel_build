@@ -22,3 +22,6 @@ SND_SOC_INTEL_BYTCR_RT5651_MACH=m
 SND_SOC_RT5651=m
 HDMI_LPE_AUDIO=m
 INTEL_SOC_PMIC_CHTWC=y
+# Disable new AMDGPU Display Engine - it breaks DisplayPort
+# on AMD Radeon RX460
+CONFIG_DRM_AMD_DC=n
