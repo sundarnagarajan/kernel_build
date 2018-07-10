@@ -1,5 +1,5 @@
---- a/kernel_build/debs/linux-4.17.5/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-09 18:06:52.161909149 -0700
-+++ b/kernel_build/debs/linux-4.17.5/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-09 18:13:35.954975525 -0700
+--- a/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-09 18:06:52.161909149 -0700
++++ b/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-09 18:13:35.954975525 -0700
 @@ -40,7 +40,10 @@
  enum {
  	BYT_RT5651_DMIC_MAP,
