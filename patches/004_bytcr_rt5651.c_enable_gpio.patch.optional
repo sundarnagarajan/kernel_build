@@ -1,5 +1,4 @@
-diff --git a/sound/soc/intel/boards/bytcr_rt5651.c 
-b/sound/soc/intel/boards/bytcr_rt5651.c
+diff --git a/sound/soc/intel/boards/bytcr_rt5651.c b/sound/soc/intel/boards/bytcr_rt5651.c
 index d920725ce603..5301205496be 100644
 --- a/sound/soc/intel/boards/bytcr_rt5651.c
 +++ b/sound/soc/intel/boards/bytcr_rt5651.c
