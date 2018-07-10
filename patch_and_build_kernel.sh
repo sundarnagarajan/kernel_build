@@ -459,14 +459,14 @@ function apply_patches {
         if [ "$base_patch_file" = "${opt_stripped}.optional" ]; then
             mandatory=0
         fi
-        local patch_out=$(patch --forward --dry-run -r - -p1 < $patch_file)
-        patch --forward -r - -p1 < $patch_file
-        patch_ret=$?
+        local patch_out=$(patch --forward --dry-run -r - -p1 < $patch_file 2>&1)
         if [ $mandatory -eq 0 ]; then
             echo "Applying optional patch: $base_patch_file:"
         else
             echo "Applying mandatory patch: $base_patch_file:"
         fi
+        patch --forward -r - -p1 < $patch_file
+        patch_ret=$?
         echo "$patch_out" | sed -e "s/^/${INDENT}/"
         if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
             echo "Mandatory patch failed"
