@@ -77,13 +77,13 @@ function check_deb_dir {
         echo "DEB_DIR not a directory: $DEB_DIR"
         return 1
     fi
-    local num_dsc_files=$(ls $DEB_DIR/*.dsc 2>/dev/null | wc -l)
+    local num_dsc_files=$(ls $DEB_DIR/linux-*.dsc 2>/dev/null | wc -l)
     if [ $num_dsc_files -lt 1 ]; then
         echo "No DSC file found in $DEB_DIR"
         return 1
     elif [ $num_dsc_files -gt 1 ]; then
         echo "More than one DSC file found in $DEB_DIR"
-        ls -1 $DEB_DIR/*.dsc | sed -e 's/^/    /'
+        ls -1 $DEB_DIR/linux-*.dsc | sed -e 's/^/    /'
         return 1
     fi
     return 0
@@ -126,13 +126,13 @@ function set_vars {
             unset KERNEL_CONFIG_PREFS
         fi
     else
-        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/config.prefs"
+        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/../config/config.prefs"
     fi
 
     INDENT="    "
     cd "${DEB_DIR}"
 
-    DSC_FILE=$(ls -1 *.dsc | head -1)
+    DSC_FILE=$(ls -1 linux-*.dsc | head -1)
     TAR_FILE=$(ls -1 *.orig.tar.gz | head -1)
     DEBIAN_TAR_FILE=$(ls -1 *.debian.tar.gz | head -1)
     DSC_FILE=$(basename $DSC_FILE)
@@ -231,6 +231,9 @@ function build_src_changes {
     if [ -n "$GPG_KEYID" -o -n "$GPG_DEFAULT_KEY_SET" ]; then
         if [ -n "$GPG_KEYID" ]; then
             echo "Using GPG KeyID ${GPG_KEYID}"
+            BUILD_OPTS="$BUILD_OPTS -k${GPG_KEYID}"
+            # Also set DEB_SIGN_KEYID and export
+            export DEB_SIGN_KEYID=${GPG_KEYID}
         else
             echo "Assuming default-key is set in gpg.conf"
         fi
@@ -245,7 +248,7 @@ function build_src_changes {
         dpkg-buildpackage $BUILD_OPTS 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
     fi
     if [ $? -ne 0 ]; then
-        echo "dpkg-buildpackage -x failed " >> "${COMPILE_OUT_FILEPATH}"
+        echo "dpkg-buildpackage -S failed " >> "${COMPILE_OUT_FILEPATH}"
         cd "$DEB_DIR"
         return 1
     fi
@@ -264,7 +267,7 @@ function upload_src_to_ppa {
     echo "" >> "${COMPILE_OUT_FILEPATH}"
     echo "--------------------------------------------------------------------------" >> "${COMPILE_OUT_FILEPATH}"
     cd "${DEB_DIR}"/"${SRC_BUILD_DIR}"
-    SRC_CHANGE_FILE=$(ls -1 *_source.changes | head -1)
+    SRC_CHANGE_FILE=$(ls -1 linux-*_source.changes | head -1)
     SRC_CHANGE_FILE=$(basename $SRC_CHANGE_FILE)
     if [ -z "$SRC_CHANGE_FILE" ]; then          # Unexpected
         echo "SRC_CHANGE_FILE not found" >> "${COMPILE_OUT_FILEPATH}"
@@ -275,7 +278,22 @@ function upload_src_to_ppa {
     echo "dput $DPUT_PPA_NAME $SRC_CHANGE_FILE" >>"${COMPILE_OUT_FILEPATH}"
     dput "$DPUT_PPA_NAME" "$SRC_CHANGE_FILE"
     show_timing_msg "Source package upload finished" "yestee" "$(get_hms)"
-    return 0
+
+    # Now upload the metapackages 
+    if [ -n "$METAPKG_BUILD_DIR" -a -d "$METAPKG_BUILD_DIR" ]; then
+        echo ""
+        echo "--------- Uploading metapackages to Launchpad ----------"
+        echo ""
+        cd "$METAPKG_BUILD_DIR"
+        for f in *_source.changes
+        do
+            echo "Uploading $f"
+            dput "$DPUT_PPA_NAME" "$f"
+        done
+    else
+        echo "METAPKG_BUILD_DIR not set or not a directory: $METAPKG_BUILD_DIR"
+        echo "Not uploading metapackages to Launchpad"
+    fi
 }
 
 

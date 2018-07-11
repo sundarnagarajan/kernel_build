@@ -1,3 +1,43 @@
+Now support uploading to a local debian repository
+Install reprepro package and do man reprepro and look at files under
+samples/local_repository_config for information
+Also look at: https://wiki.debian.org/DebianRepository/SetupWithReprepro
+
+Removed bintray-related files - bintray Debian repos don't get
+signed properly / automatically so far.
+
+Now dominant way to use is using config:
+~/.kernel_build_config
+Look at samples/sample_kernel_build.config for an annotated example
+Can still use environment variables, but number of variables
+have increased and will be clumsy.
+
+If you are ONLY building kernel locally, and do NOT want:
+- Source debs for uploading to Launchpad
+- Creation of metapackages
+- Uploading to local repo
+then do one of the following:
+
+    1. Continue as before, but add KERNEL__NO_SRC_PKG=yes to
+       environment variables
+
+    2. Start a minimal config and make sure you set:
+       KERNEL__NO_SRC_PKG=yes    - avoid building source packages
+       unset METAPKG_BUILD_DIR   - avoid building metapackages
+       unset LOCAL_DEB_REPO_DIR  - avoid uploading to local repo
+
+If you _DO_ want to build metapackages, the metapackages are
+automatically built when you call patch_and_build_kernel.sh
+RIGHT AT THE BEGINNING, so that you can enter the passphrase
+as early as possible, instead of waiting for the kernel download
+and compilation to finish.
+
+Sequence:
+
+    1. Run patch_and_build_kernel.sh
+    2. Run local_upload.sh - if desired
+    3. Run ppa_upload.sh - if desired
+
 Download and build Linux kernel source from kernel.org
 
 -   Has 'one-touch' default behavior

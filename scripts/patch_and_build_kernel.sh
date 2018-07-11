@@ -35,6 +35,7 @@ START_END_TIME_FILE=start_end.out
 #-------------------------------------------------------------------------
 KERNEL_SOURCE_SCRIPT=get_kernel_source_url.py
 SHOW_AVAIL_KERNELS_SCRIPT=show_available_kernels.py
+SHOW_CHOSEN_KERNEL_SCRIPT=show_chosen_kernel.py
 UPDATE_CONFIG_SCRIPT=update_kernel_config.py
 CHECK_REQD_PKGS_SCRIPT=required_pkgs.sh
 
@@ -189,6 +190,7 @@ function set_vars {
 
     KERNEL_SOURCE_SCRIPT=$(basename "$KERNEL_SOURCE_SCRIPT")
     SHOW_AVAIL_KERNELS_SCRIPT=$(basename "$SHOW_AVAIL_KERNELS_SCRIPT")
+    SHOW_CHOSEN_KERNEL_SCRIPT=$(basename "$SHOW_CHOSEN_KERNEL_SCRIPT")
     UPDATE_CONFIG_SCRIPT=$(basename "$UPDATE_CONFIG_SCRIPT")
     CHECK_REQD_PKGS_SCRIPT=$(basename "$CHECK_REQD_PKGS_SCRIPT")
 
@@ -200,12 +202,21 @@ function set_vars {
     # Required scripts can ONLY be in the same dir as this script
     KERNEL_SOURCE_SCRIPT="${SCRIPT_DIR}/${KERNEL_SOURCE_SCRIPT}"
     SHOW_AVAIL_KERNELS_SCRIPT="${SCRIPT_DIR}/${SHOW_AVAIL_KERNELS_SCRIPT}"
+    SHOW_CHOSEN_KERNEL_SCRIPT="${SCRIPT_DIR}/${SHOW_CHOSEN_KERNEL_SCRIPT}"
     UPDATE_CONFIG_SCRIPT="${SCRIPT_DIR}/${UPDATE_CONFIG_SCRIPT}"
     CHECK_REQD_PKGS_SCRIPT="${SCRIPT_DIR}/${CHECK_REQD_PKGS_SCRIPT}"
 
     read_config
     # DEB_DIR set in separate function because it has more complex logic
     choose_deb_dir
+
+    # We can set KERN_VER early using SHOW_CHOSEN_KERNEL_SCRIPT
+    # so that we can run metapackage_build.sh as soon as possible
+    KERN_VER=$(${SHOW_CHOSEN_KERNEL_SCRIPT})
+    if [ $? -ne 0 ]; then
+        echo "No available kernels"
+        exit 1
+    fi
 
     # Debug outputs are always in DEB_DIR
     SILENTCONFIG_OUT_FILEPATH="${DEB_DIR}/${SILENTCONFIG_OUT_FILENAME}"
@@ -215,7 +226,7 @@ function set_vars {
 
     # CONFIG_FILE, PATCH_DIR and KERNEL_CONFIG_PREFS can be overridden by
     #  environment variables
-    CONFIG_FILE_PATH="${SCRIPT_DIR}/${CONFIG_FILE}"
+    CONFIG_FILE_PATH="${SCRIPT_DIR}/../config/${CONFIG_FILE}"
     if [ -n "$KERNEL_CONFIG" ]; then
         KERNEL_CONFIG=$(readlink -f "${KERNEL_CONFIG}")
         if [ -f "$KERNEL_CONFIG" ] ; then
@@ -242,7 +253,7 @@ function set_vars {
             unset KERNEL_CONFIG_PREFS
         fi
     else
-        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/config.prefs"
+        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/../config/config.prefs"
     fi
 
     # Fix NUM_THREADS to be min(NUM_THREADS, number_of_cores)
@@ -278,6 +289,7 @@ function set_vars {
 
     KERNEL_BUILD_TARGET=deb-pkg
     if [ -n "$KERNEL__NO_SRC_PKG" ]; then
+        echo "KERNEL__NO_SRC_PKG set. Not building source packages"
         KERNEL_BUILD_TARGET=bindeb-pkg
     fi
 
@@ -361,7 +373,12 @@ function get_kernel_source {
         return 1
     fi
     # Make KERNEL_SOURCE_URL global, so we can add to Changelog
-    KERNEL_SOURCE_URL="$(${KERNEL_SOURCE_SCRIPT})"
+    KERNEL_SOURCE_URL=$(${KERNEL_SOURCE_SCRIPT})
+    if [ -z "${KERNEL_SOURCE_URL}" ]; then
+        echo "Could not get KERNEL_SOURCE_URL from ${KERNEL_SOURCE_SCRIPT}"
+        return 1
+    fi
+
     # Check URL is OK:
     curl -s -f -I "$KERNEL_SOURCE_URL" 1>/dev/null 2>&1
     if [ $? -ne 0 ]; then
@@ -382,14 +399,32 @@ function is_linux_kernel_source()
     if [ $? -ne 0 ]; then
         return 1
     fi
-    for target in clean mrproper distclean config menuconfig xconfig oldconfig defconfig silentoldconfig modules_install modules_prepare kernelversion kernelrelease install
+    # As of 4.16 silentoldconfig has moved to PHONY in scripts/kconfig/Makefile!
+    # so make help no longer lists silentoldconfig. Now also check for 'generic'
+    # linux kernel targets and packaging targets
+    # for target in clean mrproper distclean config menuconfig xconfig oldconfig defconfig modules_install modules_prepare kernelversion kernelrelease install
+    ret=0
+    for target in clean mrproper distclean config menuconfig xconfig oldconfig defconfig modules_install modules_prepare kernelversion kernelrelease install rpm-pkg binrpm-pkg deb-pkg bindeb-pkg 
+
     do
         echo "$help_out" | grep -q "^[[:space:]][[:space:]]*$target[[:space:]][[:space:]]*-[[:space:]]"
         if [ $? -ne 0 ]; then
-            return 1
+            echo "Target not found: $target" 1>>"${COMPILE_OUT_FILEPATH}"
+            ret=1
         fi
     done
-    return 0
+    # As of 4.17.0, silentoldconfig now renamed to syncconfig and is an 
+    # implementation detail - we should only use oldconfig!
+    return $ret
+
+    # Now explicitly check for silentoldconfig - that we use !
+    grep PHONY "$1"/scripts/kconfig/Makefile | awk -F'+=' '{print $2}' | grep -q silentoldconfig
+        if [ $? -ne 0 ]; then
+            echo "Target silentoldconfig not found" 1>>"${COMPILE_OUT_FILEPATH}"
+            ret=1
+        fi
+
+    return $ret
 }
 
 function kernel_version()
@@ -429,8 +464,10 @@ function set_build_dir {
         echo "Directory not found: BUILD_DIR: $BUILD_DIR"
         return 1
     fi
-    local KERN_VER=$(kernel_version "${BUILD_DIR}")
+    KERN_VER=$(kernel_version "${BUILD_DIR}")
     if [ $? -ne 0 ]; then
+        echo "DEBUG: BUILD_DIR: $BUILD_DIR"
+        echo "DEBUG: KERN_VER: $KERN_VER"
         echo "Does not look like linux kernel source"
         return 1
     fi
@@ -459,14 +496,14 @@ function apply_patches {
         if [ "$base_patch_file" = "${opt_stripped}.optional" ]; then
             mandatory=0
         fi
-        local patch_out=$(patch --forward --dry-run -r - -p1 < $patch_file 2>&1)
+        local patch_out=$(patch --forward --dry-run -r - -p1 < $patch_file)
+        patch --forward -r - -p1 < $patch_file
+        patch_ret=$?
         if [ $mandatory -eq 0 ]; then
             echo "Applying optional patch: $base_patch_file:"
         else
             echo "Applying mandatory patch: $base_patch_file:"
         fi
-        patch --forward -r - -p1 < $patch_file
-        patch_ret=$?
         echo "$patch_out" | sed -e "s/^/${INDENT}/"
         if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
             echo "Mandatory patch failed"
@@ -528,7 +565,7 @@ function run_make_silentoldconfig {
         echo "Not executable: $UPDATE_CONFIG_SCRIPT"
         return 1
     fi
-    local MAKE_CONFIG_CMD="make silentoldconfig"
+    local MAKE_CONFIG_CMD="make oldconfig"
     
     OLD_DIR="$(pwd)"
     cd "${BUILD_DIR}"
@@ -574,6 +611,23 @@ function build_kernel {
     rm -f "${DEB_DIR}/${SILENTCONFIG_OUT_FILEPATH}"
 }
 
+function build_metapackages() {
+    if [ -x "${SCRIPT_DIR}/metapackage_build.sh" -a -n "$METAPKG_BUILD_DIR" ]; then
+        echo ""
+        echo "--------- Building metapackages ----------"
+        echo "You will have to enter your pasphrase for signing metapackages"
+        echo ""
+        KERNEL_VERSION=$KERNEL_VERSION KERNEL_BUILD_DIR=$KERNEL_BUILD_DIR "${SCRIPT_DIR}/metapackage_build.sh" || exit 1
+    else
+        if [ -z "$METAPKG_BUILD_DIR" ]; then
+            echo "METAPKG_BUILD_DIR not set - Not building metapackages"
+        else 
+            echo "Metapackage build script not found: ${SCRIPT_DIR}/metapackage_build.sh"
+            echo "Not building metapackages"
+        fi
+    fi
+}
+
 
 #-------------------------------------------------------------------------
 # Actual build steps after this
@@ -591,9 +645,23 @@ rm -f "$START_END_TIME_FILEPATH"
 if [ -x "${SHOW_AVAIL_KERNELS_SCRIPT}" ]; then
     $SHOW_AVAIL_KERNELS_SCRIPT
 fi
+# Export vars needed by metapackage_build.sh
+export KERNEL_VERSION=$KERN_VER
+export KERNEL_BUILD_DIR=$DEB_DIR
+build_metapackages
     
 get_kernel_source || exit 1
 set_build_dir || exit 1
 apply_patches || exit 1
 restore_kernel_config || exit 1
 build_kernel || exit 1
+
+# Build metapackages and do local upload
+if [ -z "$METAPKG_BUILD_DIR" ]; then
+    echo "METAPKG_BUILD_DIR not set - Not calling local_upload.sh"
+    exit 0
+fi
+
+if [ -x "${SCRIPT_DIR}/local_upload.sh" ]; then
+    KERNEL_VERSION=$KERN_VER KERNEL_BUILD_DIR=$DEB_DIR "${SCRIPT_DIR}/local_upload.sh"
+fi

@@ -1,0 +1,15 @@
+Origin: cherrytux
+Label: cherrytux
+Codename: xenial
+Architectures: amd64
+Components: main
+Description: Mainline kernel with patches for Cherry Trail
+SignWith: <GPG_KeyID>
+
+Origin: cherrytux
+Label: cherrytux
+Codename: bionic
+Architectures: amd64
+Components: main
+Description: Mainline kernel with patches for Cherry Trail
+SignWith: <GPG_KeyID>

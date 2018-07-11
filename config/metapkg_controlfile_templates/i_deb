@@ -1,0 +1,16 @@
+Section: kernel
+Priority: optional
+Standards-Version: 3.9.2
+
+Package: __PKG_PREFIX__-image
+Version: __VERSION__
+Maintainer: __MAINTAINER__
+Depends: linux-image-__VERSION__
+# Architecture: all
+Description: Pulls in linux-image-__VERSION__
+ This is a metapackage that pulls in:
+ linux-image-__VERSION__
+ 
+ This package can safely be removed - however, apt-get upgrade will then
+ no longer automatically trigger install of newer linux-image-x.y.z
+ packages

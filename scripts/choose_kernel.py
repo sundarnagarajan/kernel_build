@@ -10,7 +10,7 @@ def get_chosen_kernel_url(verbose=False):
     Returns-->kernel_url.KernelURL namedtuple or None
     '''
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    config_file = os.path.join(script_dir, 'config.kernel')
+    config_file = os.path.join(script_dir, '../config/config.kernel')
     override_config_file = os.environ.get('KERNEL_CONFIG', None)
     if override_config_file:
         if os.path.isfile(override_config_file):
@@ -24,6 +24,13 @@ def get_chosen_kernel_url(verbose=False):
 
     override_ktype = os.environ.get('KERNEL_TYPE', None)
     override_kver = os.environ.get('KERNEL_VERSION', None)
+    # If KERNEL_VERSION has 3 components AND LAST component
+    # ends in '.0', strip trailing '.0'
+    if override_kver:
+        override_kver_comps = override_kver.split('.', 2)
+        if len(override_kver_comps) > 2 and override_kver_comps[2] == '0':
+            override_kver = '.'.join(override_kver_comps[:2])
+
     if (override_ktype or override_kver):
         if override_ktype is not None and override_ktype not in [
             'latest',

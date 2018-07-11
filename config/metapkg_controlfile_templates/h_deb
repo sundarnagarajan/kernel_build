@@ -1,0 +1,17 @@
+Section: kernel
+Priority: optional
+Standards-Version: 3.9.2
+
+Package: __PKG_PREFIX__-headers
+Version: __VERSION__
+Maintainer: __MAINTAINER__
+Depends: linux-headers-__VERSION__,linux-libc-dev (>=__VERSION__)
+# Architecture: all
+Description: Pulls in linux-headers-__VERSION__ and linux-libc-dev version >= __VERSION__
+ This is a metapackage that pulls in:
+ linux-headers-__VERSION__
+ linux-libc-dev version __VERSION__ or greater
+ 
+ This package can safely be removed - however, apt-get upgrade will then
+ no longer automatically trigger install of newer linux-headers-x.y.z
+ packages

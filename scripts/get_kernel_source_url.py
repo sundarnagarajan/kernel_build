@@ -2,7 +2,7 @@
 '''
 Following environment variables can be set to override default logic:
     KERNEL_CONFIG    : FULL PATH to existing config file
-                       Will override config.kernel in this directory
+                       Will override config.kernel in ../config
     KERNEL_VERSION   : Will override version from config file
                        Will filter available kernels
     KERNEL_TYPE      : Will filter available kernels
@@ -24,7 +24,9 @@ Default logic:
         of preference of kernel type as above.
         Can override (filter) with KERNEL_TYPE
 '''
-
+import sys
 from choose_kernel import get_chosen_kernel_url
 
-get_chosen_kernel_url(verbose=True)
+kurl = get_chosen_kernel_url(verbose=False)
+if kurl:
+    sys.stdout.write(kurl.download_url + '\n')

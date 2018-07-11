@@ -1,0 +1,17 @@
+Source: __PKG_PREFIX__-image
+Section: kernel
+Priority: optional
+Maintainer: __MAINTAINER__
+Build-Depends: debhelper (>=9)
+Standards-Version: 3.9.6
+
+Package: __PKG_PREFIX__-image
+Architecture: all
+Depends: linux-image-__VERSION__
+Description: Pulls in linux-image-__VERSION__
+ This is a metapackage that pulls in:
+ linux-image-__VERSION__
+ .
+ This package can safely be removed - however, apt-get upgrade will then
+ no longer automatically trigger install of newer linux-image-x.y.z
+ packages
