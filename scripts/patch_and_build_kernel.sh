@@ -236,7 +236,7 @@ function set_vars {
             return 1
         fi
     fi
-    PATCH_DIR_PATH="${SCRIPT_DIR}/../patches/${PATCH_DIR}"
+    PATCH_DIR_PATH="${SCRIPT_DIR}/../${PATCH_DIR}"
     if [ -n "${KERNEL_PATCH_DIR}" ]; then
         KERNEL_PATCH_DIR=$(readlink -f "${KERNEL_PATCH_DIR}")
         if [ -d "${KERNEL_PATCH_DIR}" ] ; then
