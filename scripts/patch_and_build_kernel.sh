@@ -179,6 +179,9 @@ function read_config {
     # Some variables need to be EXPORTED
     export DEBEMAIL
     export DEBFULLNAME
+    if [ -n "$KERNEL_TYPE" ]; then
+        export KERNEL_TYPE
+    fi
 }
 
 function set_vars {
