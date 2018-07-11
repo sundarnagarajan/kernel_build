@@ -25,7 +25,7 @@ PROGNAME=$(basename $0)
 SCRIPT_DIR=$(readlink -f $(dirname $0))
 
 # Global variables
-INPUT_FILE_DIR=${SCRIPT_DIR}/../config/metapkg_controlfile_templates
+INPUT_FILE_DIR=$(readlink -f ${SCRIPT_DIR}/../config/metapkg_controlfile_templates)
 I_DEB=i_deb
 I_SRC=i_src
 H_DEB=h_deb

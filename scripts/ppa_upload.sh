@@ -126,7 +126,7 @@ function set_vars {
             unset KERNEL_CONFIG_PREFS
         fi
     else
-        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/../config/config.prefs"
+        KERNEL_CONFIG_PREFS=$(readlink -f "${SCRIPT_DIR}/../config/config.prefs")
     fi
 
     INDENT="    "

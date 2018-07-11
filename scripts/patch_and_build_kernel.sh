@@ -226,7 +226,7 @@ function set_vars {
 
     # CONFIG_FILE, PATCH_DIR and KERNEL_CONFIG_PREFS can be overridden by
     #  environment variables
-    CONFIG_FILE_PATH="${SCRIPT_DIR}/../config/${CONFIG_FILE}"
+    CONFIG_FILE_PATH=$(readlink -f "${SCRIPT_DIR}/../config/${CONFIG_FILE}")
     if [ -n "$KERNEL_CONFIG" ]; then
         KERNEL_CONFIG=$(readlink -f "${KERNEL_CONFIG}")
         if [ -f "$KERNEL_CONFIG" ] ; then
@@ -236,7 +236,7 @@ function set_vars {
             return 1
         fi
     fi
-    PATCH_DIR_PATH="${SCRIPT_DIR}/../${PATCH_DIR}"
+    PATCH_DIR_PATH=$(readlink -f "${SCRIPT_DIR}/../${PATCH_DIR}")
     if [ -n "${KERNEL_PATCH_DIR}" ]; then
         KERNEL_PATCH_DIR=$(readlink -f "${KERNEL_PATCH_DIR}")
         if [ -d "${KERNEL_PATCH_DIR}" ] ; then
@@ -253,7 +253,7 @@ function set_vars {
             unset KERNEL_CONFIG_PREFS
         fi
     else
-        KERNEL_CONFIG_PREFS="${SCRIPT_DIR}/../config/config.prefs"
+        KERNEL_CONFIG_PREFS=$(readlink -f "${SCRIPT_DIR}/../config/config.prefs")
     fi
 
     # Fix NUM_THREADS to be min(NUM_THREADS, number_of_cores)
