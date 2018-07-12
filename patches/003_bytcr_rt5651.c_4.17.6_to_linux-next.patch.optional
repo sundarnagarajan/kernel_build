@@ -1,7 +1,5 @@
-diff --git a/sound/soc/intel/boards/bytcr_rt5651.c b/sound/soc/intel/boards/bytcr_rt5651.c
-index 987720e..b687043 100644
---- a/sound/soc/intel/boards/bytcr_rt5651.c
-+++ b/sound/soc/intel/boards/bytcr_rt5651.c
+--- sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:08:59.388955880 -0700
++++ bytcr_rt5651.c	2018-07-11 17:09:30.217565814 -0700
 @@ -26,8 +26,12 @@
  #include <linux/clk.h>
  #include <linux/device.h>
@@ -26,7 +24,7 @@ index 987720e..b687043 100644
  };
  
  enum {
-@@ -76,21 +77,25 @@ enum {
+@@ -76,21 +77,25 @@
  #define BYT_RT5651_SSP2_AIF2		BIT(19) /* default is using AIF1  */
  #define BYT_RT5651_SSP0_AIF1		BIT(20)
  #define BYT_RT5651_SSP0_AIF2		BIT(21)
@@ -58,7 +56,7 @@ index 987720e..b687043 100644
  
  static void log_quirks(struct device *dev)
  {
-@@ -98,12 +103,8 @@ static void log_quirks(struct device *dev)
+@@ -98,12 +103,8 @@
  		dev_info(dev, "quirk DMIC_MAP enabled");
  	if (BYT_RT5651_MAP(byt_rt5651_quirk) == BYT_RT5651_IN1_MAP)
  		dev_info(dev, "quirk IN1_MAP enabled");
@@ -73,7 +71,7 @@ index 987720e..b687043 100644
  	if (BYT_RT5651_JDSRC(byt_rt5651_quirk)) {
  		dev_info(dev, "quirk realtek,jack-detect-source %ld\n",
  			 BYT_RT5651_JDSRC(byt_rt5651_quirk));
-@@ -211,6 +212,20 @@ static int platform_clock_control(struct snd_soc_dapm_widget *w,
+@@ -211,6 +212,20 @@
  	return 0;
  }
  
@@ -94,7 +92,7 @@ index 987720e..b687043 100644
  static const struct snd_soc_dapm_widget byt_rt5651_widgets[] = {
  	SND_SOC_DAPM_HP("Headphone", NULL),
  	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-@@ -220,7 +235,9 @@ static const struct snd_soc_dapm_widget byt_rt5651_widgets[] = {
+@@ -220,7 +235,9 @@
  	SND_SOC_DAPM_SUPPLY("Platform Clock", SND_SOC_NOPM, 0, 0,
  			    platform_clock_control, SND_SOC_DAPM_PRE_PMU |
  			    SND_SOC_DAPM_POST_PMD),
@@ -105,7 +103,7 @@ index 987720e..b687043 100644
  };
  
  static const struct snd_soc_dapm_route byt_rt5651_audio_map[] = {
-@@ -228,6 +245,7 @@ static const struct snd_soc_dapm_route byt_rt5651_audio_map[] = {
+@@ -228,6 +245,7 @@
  	{"Headset Mic", NULL, "Platform Clock"},
  	{"Internal Mic", NULL, "Platform Clock"},
  	{"Speaker", NULL, "Platform Clock"},
@@ -113,7 +111,7 @@ index 987720e..b687043 100644
  	{"Line In", NULL, "Platform Clock"},
  
  	{"Headset Mic", NULL, "micbias1"}, /* lowercase for rt5651 */
-@@ -241,38 +259,20 @@ static const struct snd_soc_dapm_route byt_rt5651_audio_map[] = {
+@@ -241,38 +259,20 @@
  };
  
  static const struct snd_soc_dapm_route byt_rt5651_intmic_dmic_map[] = {
@@ -154,7 +152,7 @@ index 987720e..b687043 100644
  	{"IN2P", NULL, "Internal Mic"},
  	{"IN3P", NULL, "Headset Mic"},
  };
-@@ -357,46 +357,55 @@ static int byt_rt5651_quirk_cb(const struct dmi_system_id *id)
+@@ -357,46 +357,55 @@
  
  static const struct dmi_system_id byt_rt5651_quirk_table[] = {
  	{
@@ -228,7 +226,7 @@ index 987720e..b687043 100644
  	},
  	{
  		/* VIOS LTH17 */
-@@ -405,10 +414,7 @@ static const struct dmi_system_id byt_rt5651_quirk_table[] = {
+@@ -405,10 +414,7 @@
  			DMI_MATCH(DMI_SYS_VENDOR, "VIOS"),
  			DMI_MATCH(DMI_PRODUCT_NAME, "LTH17"),
  		},
@@ -240,7 +238,7 @@ index 987720e..b687043 100644
  					BYT_RT5651_IN1_IN2_MAP),
  	},
  	{}
-@@ -418,15 +424,10 @@ static const struct dmi_system_id byt_rt5651_quirk_table[] = {
+@@ -418,15 +424,10 @@
   * Note this MUST be called before snd_soc_register_card(), so that the props
   * are in place before the codec component driver's probe function parses them.
   */
@@ -258,7 +256,7 @@ index 987720e..b687043 100644
  
  	props[cnt++] = PROPERTY_ENTRY_U32("realtek,jack-detect-source",
  				BYT_RT5651_JDSRC(byt_rt5651_quirk));
-@@ -440,10 +441,7 @@ static int byt_rt5651_add_codec_device_props(const char *i2c_dev_name)
+@@ -440,10 +441,7 @@
  	if (byt_rt5651_quirk & BYT_RT5651_DMIC_EN)
  		props[cnt++] = PROPERTY_ENTRY_BOOL("realtek,dmic-en");
  
@@ -270,7 +268,7 @@ index 987720e..b687043 100644
  }
  
  static int byt_rt5651_init(struct snd_soc_pcm_runtime *runtime)
-@@ -467,22 +465,10 @@ static int byt_rt5651_init(struct snd_soc_pcm_runtime *runtime)
+@@ -467,22 +465,10 @@
  		custom_map = byt_rt5651_intmic_in1_map;
  		num_routes = ARRAY_SIZE(byt_rt5651_intmic_in1_map);
  		break;
@@ -293,7 +291,7 @@ index 987720e..b687043 100644
  	default:
  		custom_map = byt_rt5651_intmic_dmic_map;
  		num_routes = ARRAY_SIZE(byt_rt5651_intmic_dmic_map);
-@@ -546,13 +532,17 @@ static int byt_rt5651_init(struct snd_soc_pcm_runtime *runtime)
+@@ -546,13 +532,17 @@
  
  	if (BYT_RT5651_JDSRC(byt_rt5651_quirk)) {
  		ret = snd_soc_card_jack_new(runtime->card, "Headset",
@@ -313,7 +311,7 @@ index 987720e..b687043 100644
  		ret = snd_soc_component_set_jack(codec, &priv->jack, NULL);
  		if (ret)
  			return ret;
-@@ -691,6 +681,48 @@ static struct snd_soc_dai_link byt_rt5651_dais[] = {
+@@ -691,6 +681,48 @@
  };
  
  /* SoC card */
@@ -362,7 +360,7 @@ index 987720e..b687043 100644
  static struct snd_soc_card byt_rt5651_card = {
  	.name = "bytcr-rt5651",
  	.owner = THIS_MODULE,
-@@ -701,24 +733,26 @@ static struct snd_soc_card byt_rt5651_card = {
+@@ -701,24 +733,26 @@
  	.dapm_routes = byt_rt5651_audio_map,
  	.num_dapm_routes = ARRAY_SIZE(byt_rt5651_audio_map),
  	.fully_routed = true,
@@ -404,7 +402,7 @@ index 987720e..b687043 100644
  
  struct acpi_chan_package {   /* ACPICA seems to require 64 bit integers */
  	u64 aif_value;       /* 1: AIF1, 2: AIF2 */
-@@ -727,13 +761,12 @@ struct acpi_chan_package {   /* ACPICA seems to require 64 bit integers */
+@@ -727,13 +761,12 @@
  
  static int snd_byt_rt5651_mc_probe(struct platform_device *pdev)
  {
@@ -421,7 +419,7 @@ index 987720e..b687043 100644
  	bool is_bytcr = false;
  	int ret_val = 0;
  	int dai_index = 0;
-@@ -767,11 +800,16 @@ static int snd_byt_rt5651_mc_probe(struct platform_device *pdev)
+@@ -767,11 +800,16 @@
  		"%s%s", "i2c-", i2c_name);
  	byt_rt5651_dais[dai_index].codec_name = byt_rt5651_codec_name;
  
@@ -439,7 +437,7 @@ index 987720e..b687043 100644
  		struct sst_platform_info *p_info = mach->pdata;
  		const struct sst_res_info *res_info = p_info->res_info;
  
-@@ -830,9 +868,37 @@ static int snd_byt_rt5651_mc_probe(struct platform_device *pdev)
+@@ -830,9 +868,37 @@
  	dmi_check_system(byt_rt5651_quirk_table);
  
  	/* Must be called before register_card, also see declaration comment. */
@@ -479,7 +477,7 @@ index 987720e..b687043 100644
  
  	log_quirks(&pdev->dev);
  
-@@ -876,10 +942,14 @@ static int snd_byt_rt5651_mc_probe(struct platform_device *pdev)
+@@ -876,10 +942,14 @@
  		}
  	}
  
