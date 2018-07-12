@@ -1,5 +1,5 @@
---- a/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:08:59.388955880 -0700
-+++ b/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:09:30.217565814 -0700
+--- a/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 07:31:35.000000000 -0700
++++ b/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:26:36.833837042 -0700
 @@ -26,8 +26,12 @@
  #include <linux/clk.h>
  #include <linux/device.h>
@@ -360,7 +360,7 @@
  static struct snd_soc_card byt_rt5651_card = {
  	.name = "bytcr-rt5651",
  	.owner = THIS_MODULE,
-@@ -701,24 +733,26 @@
+@@ -701,23 +733,26 @@
  	.dapm_routes = byt_rt5651_audio_map,
  	.num_dapm_routes = ARRAY_SIZE(byt_rt5651_audio_map),
  	.fully_routed = true,
@@ -371,7 +371,6 @@
 -static char byt_rt5651_codec_name[SND_ACPI_I2C_ID_LEN];
 -static char byt_rt5651_codec_aif_name[12]; /*  = "rt5651-aif[1|2]" */
 -static char byt_rt5651_cpu_dai_name[10]; /*  = "ssp[0|2]-port" */
--static char byt_rt5651_long_name[40]; /* = "bytcr-rt5651-*-spk-*-mic" */
 +static const struct x86_cpu_id baytrail_cpu_ids[] = {
 +	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_SILVERMONT1 }, /* Valleyview */
 +	{}
@@ -402,14 +401,10 @@
  
  struct acpi_chan_package {   /* ACPICA seems to require 64 bit integers */
  	u64 aif_value;       /* 1: AIF1, 2: AIF2 */
-@@ -727,13 +761,12 @@
+@@ -726,15 +761,18 @@
  
  static int snd_byt_rt5651_mc_probe(struct platform_device *pdev)
  {
--	const char * const intmic_name[] =
--		{ "dmic", "in1", "in2", "in12", "in1", "in2" };
--	const char * const hsmic_name[] =
--		{  "in2", "in2", "in1",  "in3", "in3", "in3" };
 +	const char * const mic_name[] = { "dmic", "in1", "in12" };
  	struct byt_rt5651_private *priv;
  	struct snd_soc_acpi_mach *mach;
@@ -419,7 +414,14 @@
  	bool is_bytcr = false;
  	int ret_val = 0;
  	int dai_index = 0;
-@@ -767,11 +800,16 @@
+ 	int i;
+ 
+-	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_ATOMIC);
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
+@@ -762,11 +800,16 @@
  		"%s%s", "i2c-", i2c_name);
  	byt_rt5651_dais[dai_index].codec_name = byt_rt5651_codec_name;
  
@@ -437,7 +439,7 @@
  		struct sst_platform_info *p_info = mach->pdata;
  		const struct sst_res_info *res_info = p_info->res_info;
  
-@@ -830,9 +868,37 @@
+@@ -825,9 +868,37 @@
  	dmi_check_system(byt_rt5651_quirk_table);
  
  	/* Must be called before register_card, also see declaration comment. */
@@ -477,7 +479,20 @@
  
  	log_quirks(&pdev->dev);
  
-@@ -876,10 +942,14 @@
+@@ -856,9 +927,10 @@
+ 	if (byt_rt5651_quirk & BYT_RT5651_MCLK_EN) {
+ 		priv->mclk = devm_clk_get(&pdev->dev, "pmc_plt_clk_3");
+ 		if (IS_ERR(priv->mclk)) {
++			ret_val = PTR_ERR(priv->mclk);
+ 			dev_err(&pdev->dev,
+-				"Failed to get MCLK from pmc_plt_clk_3: %ld\n",
+-				PTR_ERR(priv->mclk));
++				"Failed to get MCLK from pmc_plt_clk_3: %d\n",
++				ret_val);
+ 			/*
+ 			 * Fall back to bit clock usage for -ENOENT (clock not
+ 			 * available likely due to missing dependencies), bail
+@@ -870,6 +942,16 @@
  		}
  	}
  
@@ -486,12 +501,11 @@
 +	else
 +		hp_swapped = "";
 +
- 	snprintf(byt_rt5651_long_name, sizeof(byt_rt5651_long_name),
--		 "bytcr-rt5651-%s-intmic-%s-hsmic",
--		 intmic_name[BYT_RT5651_MAP(byt_rt5651_quirk)],
--		 hsmic_name[BYT_RT5651_MAP(byt_rt5651_quirk)]);
++	snprintf(byt_rt5651_long_name, sizeof(byt_rt5651_long_name),
 +		 "bytcr-rt5651-%s-mic%s",
 +		 mic_name[BYT_RT5651_MAP(byt_rt5651_quirk)], hp_swapped);
- 	byt_rt5651_card.long_name = byt_rt5651_long_name;
- 
++	byt_rt5651_card.long_name = byt_rt5651_long_name;
++
  	ret_val = devm_snd_soc_register_card(&pdev->dev, &byt_rt5651_card);
+ 
+ 	if (ret_val) {
