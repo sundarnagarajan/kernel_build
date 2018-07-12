@@ -1,5 +1,5 @@
---- sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:08:59.388955880 -0700
-+++ bytcr_rt5651.c	2018-07-11 17:09:30.217565814 -0700
+--- a/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:08:59.388955880 -0700
++++ b/sound/soc/intel/boards/bytcr_rt5651.c	2018-07-11 17:09:30.217565814 -0700
 @@ -26,8 +26,12 @@
  #include <linux/clk.h>
  #include <linux/device.h>
