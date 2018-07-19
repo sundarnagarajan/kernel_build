@@ -1,18 +1,5 @@
 #!/bin/bash
 #-------------------------------------------------------------------------
-# Following are plain filenames - expected in same dir as this script
-#-------------------------------------------------------------------------
-# Patch directory - all patches are expected to be in files in this dir
-# Can be overridden by KERNEL_PATCH_DIR env var
-# - Each file in directory can contain one or more patches
-# - Patches are applied in file (lexicographic order)
-# - Patch filenames ending in '.optional' are applied if possible.
-#   Failures are ignored
-# - Patch filenames NOT ending in '.optional' are considered mandatory.
-#   Kernel build FAILS if patch does not apply.
-PATCH_DIR=patches
-
-#-------------------------------------------------------------------------
 # Following are debug outputs - will be created in DEB_DIR
 # Filenames cannot be overridden by environment vars
 #-------------------------------------------------------------------------
@@ -93,8 +80,6 @@ function set_vars {
     #-------------------------------------------------------------------------
     # Strip off directory path components if we expect only filenames
     #-------------------------------------------------------------------------
-    CONFIG_FILE=$(basename "$CONFIG_FILE")
-    PATCH_DIR=$(basename "$PATCH_DIR")
     CHECK_REQD_PKGS_SCRIPT=$(basename "$CHECK_REQD_PKGS_SCRIPT")
 
     COMPILE_OUT_FILENAME=$(basename "$COMPILE_OUT_FILENAME")
@@ -107,45 +92,29 @@ function set_vars {
     COMPILE_OUT_FILEPATH="${DEB_DIR}/${COMPILE_OUT_FILENAME}"
     START_END_TIME_FILEPATH="${DEB_DIR}/$START_END_TIME_FILE"
 
-    # CONFIG_FILE, PATCH_DIR and KERNEL_CONFIG_PREFS can be overridden by
-    #  environment variables
-    PATCH_DIR_PATH="${SCRIPT_DIR}/${PATCH_DIR}"
-    if [ -n "${KERNEL_PATCH_DIR}" ]; then
-        KERNEL_PATCH_DIR=$(readlink -f "${KERNEL_PATCH_DIR}")
-        if [ -d "${KERNEL_PATCH_DIR}" ] ; then
-            PATCH_DIR_PATH="${KERNEL_PATCH_DIR}"
-        else
-            echo "Ignoring non-existent patch directory : ${KERNEL_PATCH_DIR}"
-            unset PATCH_DIR_PATH
-        fi
-    fi
-    if [ -n "${KERNEL_CONFIG_PREFS}" ]; then
-        KERNEL_CONFIG_PREFS=$(readlink -f "${KERNEL_CONFIG_PREFS}")
-        if [ ! -f "${KERNEL_CONFIG_PREFS}" ] ; then
-            echo "Ignoring non-existent config prefs : ${KERNEL_CONFIG_PREFS}"
-            unset KERNEL_CONFIG_PREFS
-        fi
-    else
-        KERNEL_CONFIG_PREFS=$(readlink -f "${SCRIPT_DIR}/../config/config.prefs")
-    fi
-
     INDENT="    "
     cd "${DEB_DIR}"
 
     DSC_FILE=$(ls -1 linux-*.dsc | head -1)
     TAR_FILE=$(ls -1 *.orig.tar.gz | head -1)
     DEBIAN_TAR_FILE=$(ls -1 *.debian.tar.gz | head -1)
+    # Kernel 4.17.6 seems to have started using .diff.gz instead of .debian.tar.gz!
+    DIFF_GZ_FILE=$(ls -1 linux-*.diff.gz | head -1)
     DSC_FILE=$(basename $DSC_FILE)
     TAR_FILE=$(basename $TAR_FILE)
-    DEBIAN_TAR_FILE=$(basename $DEBIAN_TAR_FILE)
+    if [ -n "$DEBIAN_TAR_FILE" ]; then
+        DEBIAN_TAR_FILE=$(basename $DEBIAN_TAR_FILE)
+    fi
+    if [ -n "$DIFF_GZ_FILE" ]; then
+        DIFF_GZ_FILE=$(basename $DIFF_GZ_FILE)
+    fi
 
     # Print what we are using
-    printf "%-24s : %s\n" "Patch dir" "${PATCH_DIR_PATH}"
-    printf "%-24s : %s\n" "Config prefs" "${KERNEL_CONFIG_PREFS}"
     printf "%-24s : %s\n" "DEBS built in" "${DEB_DIR}"
     printf "%-24s : %s\n" "DSC_FILE" "$DSC_FILE"
     printf "%-24s : %s\n" "TAR_FILE" "$TAR_FILE"
     printf "%-24s : %s\n" "DEBIAN_TAR_FILE" "$DEBIAN_TAR_FILE"
+    printf "%-24s : %s\n" "DIFF_GZ_FILE" "$DIFF_GZ_FILE"
     printf "%-24s : %s\n" "Build output" "$COMPILE_OUT_FILEPATH"
 }
 
@@ -207,9 +176,11 @@ function build_src_changes {
     # Make a new directory for source build
     SRC_BUILD_DIR=$(mktemp -d -p .)
     cd ${SRC_BUILD_DIR}
-    for f in ${DSC_FILE} ${TAR_FILE} ${DEBIAN_TAR_FILE}
+    for f in ${DSC_FILE} ${TAR_FILE} ${DEBIAN_TAR_FILE} ${DIFF_GZ_FILE}
     do
-        cp ../$f .
+        if [ -n "$f" ]; then
+            cp ../$f .
+        fi
     done
     dpkg-source -x ${DSC_FILE} linux 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
     if [ $? -ne 0 ]; then
@@ -220,7 +191,7 @@ function build_src_changes {
     for f in ${DSC_FILE} linux/debian/control
     do
         # Update Build-depends
-        sed -i '/^Build-Depends: / s/$/, libelf-dev, libncurses5-dev, libssl-dev, libfile-fcntllock-perl, fakeroot/' $f
+        sed -i '/^Build-Depends: / s/$/, libelf-dev, libncurses5-dev, libssl-dev, libfile-fcntllock-perl, fakeroot, bison/' $f
         # Update Maintainer
         if [ -n "$PPA_MAINTAINER" ]; then
             sed -i "s/^Maintainer: .*$/Maintainer: $PPA_MAINTAINER/" $f
