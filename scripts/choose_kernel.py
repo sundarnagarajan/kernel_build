@@ -4,14 +4,45 @@ import re
 from kernel_url import get_kernel_urls, filter_kernel_urls
 
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
+config_file = os.path.join(script_dir, '../config/config.kernel')
+override_config_file = os.environ.get('KERNEL_CONFIG', None)
+
+
+def get_config_version(verbose=False):
+    global script_dir, config_file, override_config_file
+    kver = None
+    if override_config_file:
+        if os.path.isfile(override_config_file):
+            config_file = os.path.realpath(override_config_file)
+            if verbose:
+                print('Using config: %s' % (config_file,))
+        else:
+            if verbose:
+                print('Ignoring non-existent config file: %s' % (
+                    override_config_file,))
+
+    try:
+        cfg_src = open(config_file, 'r').read()
+        pat = '\# Linux.*? (?P<KVER>.*?) Kernel Configuration'
+        m = re.search(pat, cfg_src)
+        if m:
+            kver = m.groupdict()['KVER']
+            # Take only major and minor version, not revision number
+            kver = '.'.join(kver.split('.')[:2])
+    except:
+        pass
+    if kver:
+        if verbose:
+            print('Available config is from kernel %s' % (kver,))
+
+
 def get_chosen_kernel_url(verbose=False):
     '''
     verbose-->boolean: If True, user-centric output is printed to stdout
     Returns-->kernel_url.KernelURL namedtuple or None
     '''
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    config_file = os.path.join(script_dir, '../config/config.kernel')
-    override_config_file = os.environ.get('KERNEL_CONFIG', None)
+    global script_dir, config_file, override_config_file
     if override_config_file:
         if os.path.isfile(override_config_file):
             config_file = os.path.realpath(override_config_file)
@@ -36,7 +67,10 @@ def get_chosen_kernel_url(verbose=False):
             'latest',
             'mainline',
             'stable',
-            'longterm'
+            'longterm',
+            'linux-next',
+            'torvalds',
+            'unsupported',
         ]:
             if verbose:
                 print('Ignoring invalid KERNEL_TYPE in environment: %s' % (
@@ -94,10 +128,21 @@ def get_chosen_kernel_url(verbose=False):
                         kurl.kver, kurl.ktype
                     ))
             else:
-                if verbose:
-                    print('No available kernels based on settings %s (%s)' % (
-                        kver, ktype
-                    ))
+                # Try based on JUST kver (older kernels)
+                kurl = filter_kernel_urls(
+                    l,
+                    kver=override_kver,
+                )
+                if kurl:
+                    if verbose:
+                        print('Based on settings, will choose %s (%s)' % (
+                            kurl.kver, kurl.ktype
+                        ))
+                else:
+                    if verbose:
+                        print(
+                            'No available kernels based'
+                            ' on settings %s (%s)' % (kver, ktype))
     else:
         if verbose:
             print('No available kernels based on settings %s (%s)' % (

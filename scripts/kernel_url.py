@@ -1,10 +1,12 @@
 '''
 New version that uses the JSON API at www.kernel.org
 '''
+import os
 import sys
 import subprocess
 import json
 from collections import namedtuple
+import httplib2
 import traceback
 
 
@@ -17,6 +19,20 @@ KernelURL = namedtuple('KernelURL', [
     'release_date',
 ])
 KERNEL_ORG_JSON_URL = 'https://www.kernel.org/releases.json'
+
+
+def url_is_valid(u):
+    '''
+    u-->str: URL
+    Returns-->boolean
+    '''
+    try:
+        h = httplib2.Http()
+        r = h.request(u, 'HEAD')
+        code = r[0]['status']
+    except:
+        return False
+    return (code == '200')
 
 
 def get_kernel_urls(show_exception=True):
@@ -75,11 +91,65 @@ def get_kernel_urls(show_exception=True):
         # Add latest one as first element
         if latest_kurl:
             ret.insert(0, latest_kurl)
+
+        # Add linux-next and torvalds kernels
+        kurl = KernelURL(
+            ktype='linux-next',
+            kver='unknown',
+            download_url='git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git',   # noqa: E501
+            sig_url='',
+            changelog_url='',
+            release_date='from_git',
+        )
+        ret.append(kurl)
+        kurl = KernelURL(
+            ktype='torvalds',
+            kver='unknown',
+            download_url='git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git',   # noqa: E501
+            sig_url='',
+            changelog_url='',
+            release_date='from_git',
+        )
+        ret.append(kurl)
+
+        # If KERNEL_VERSION is set and not present in kernel.org JSON,
+        # add as separate entry pointing at specific download URL
+        override_kver = os.environ.get('KERNEL_VERSION', None)
+        if override_kver and not kernel_version_found(ret, override_kver):
+            fmt_stable = 'https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/snapshot/linux-%s.tar.gz'   # noqa: E501
+            u = fmt_stable % (override_kver,)
+            ktype = 'unsupported'
+            if not url_is_valid(u):
+                u = None
+            if u is not None:
+                kurl = KernelURL(
+                    ktype=ktype,
+                    kver=override_kver,
+                    download_url=u,
+                    sig_url='',
+                    changelog_url='',
+                    release_date='snapshot',
+                )
+                ret.append(kurl)
+            else:
+                print('DEBUG: invalid url: ', u)
     except:
         if show_exception:
             sys.stderr.write(traceback.format_exc())
         pass
     return ret
+
+
+def kernel_version_found(l, kver):
+    '''
+    l-->LIST of KernelURL namedtuples - as returned by get_kernel_urls()
+    kver-->str or None: If str:
+    Returns-->boolean
+    '''
+    for u in l:
+        if u.kver == kver:
+            return True
+    return False
 
 
 def filter_kernel_urls(l, ktype=None, kver=None):
@@ -119,4 +189,18 @@ def filter_kernel_urls(l, ktype=None, kver=None):
     if ret:
         return ret[0]
     else:
+        # Look for ktype == 'unsupported' (older kernel not in JSON)
+        override_kver = os.environ.get('KERNEL_VERSION', None)
+        if override_kver:
+            for u in l:
+                if ktype != 'unsupported':
+                    continue
+                if u.kver == override_kver:
+                    ret.append(u)
+                    break
+            if ret:
+                return ret[0]
+            else:
+                return None
+
         return None

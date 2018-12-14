@@ -1,4 +1,9 @@
 #!/bin/bash
+# ------------------------------------------------------------------------
+# This script automatically rebuilds the linux kernel source package
+# with an incremented version so that upload to launchpad PPA
+# can be attempted again if previous upload failed
+# ------------------------------------------------------------------------
 if [ -n "$BASH_SOURCE" ]; then
     PROG_PATH=${PROG_PATH:-$(readlink -e $BASH_SOURCE)}
 else
@@ -10,20 +15,19 @@ SCRIPT_DIR="${PROG_DIR}"
 
 . ${SCRIPT_DIR}/build_kernel_functions.sh 1>/dev/null 2>&1 || exit 1
 
-
 # ------------------------------------------------------------------------
 # Actual program starts after this
 # ------------------------------------------------------------------------
 
-ppa_upload_check_deb_dir || exit 1
-ppa_upload_set_vars
 $PPA_UPLOAD_CHECK_REQD_PKGS_SCRIPT || exit 1
+reupload_set_vars || exit 1
+reupload_rebuild_src_pkg "$@"
 
-ppa_upload_build_src_changes || exit 1
-ppa_upload_upload_src_to_ppa || exit 1
+ppa_upload_set_vars
+ppa_upload_check_deb_dir || exit 1
 
+reupload_upload_src_to_ppa
 
 echo "-------------------------- PPA upload time -----------------------------------"
 cat $START_END_TIME_FILEPATH
 echo "------------------------------------------------------------------------------"
-\rm -f "${COMPILE_OUT_FILEPATH}" "$START_END_TIME_FILEPATH"

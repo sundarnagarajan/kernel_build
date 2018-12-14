@@ -1,0 +1,253 @@
+-------------------------------------------------------------------------
+ Environment variables:
+-------------------------------------------------------------------------
+ The following are _THE_ list of environment variables that are used
+ if set. These variables (except KERNEL_BUILD_CONFIG) can also be set
+ in the config file - by default this is ~/.kernel_build.config, but
+ location of config can be overridden by KERNEL_BUILD_CONFIG variable
+
+       --------------------------------------------------------
+       - Config variables override defaults
+       - Environment variables override config variables
+       - Config variables NEVER override environment variables
+       --------------------------------------------------------
+
+ KERNEL_BUILD_DIR
+   Dir named '__kernel_build' will be deleted and re-created under this
+   directory. No other file or directory under KERNEL_BUILD_DIR will
+   be created, changed or deleted
+
+   If not set, current working directory is used
+
+   KERNEL_BUILD_DIR cannot contain spaces or colons
+   This is a limitation of the Linux kernel Makefile
+   If KERNEL_BUILD_DIR contains spaces or colons, you will get an error
+   that looks like:
+       Makefile:128: *** main directory cannot contain spaces nor colons.  Stop."
+
+ KERNEL_TYPE
+   Can be one of the following:
+       latest
+       mainline
+       stable
+       longterm
+       linux-next
+       torvalds
+   If KERNEL_SOURCE_URL is set, KERNEL_TYPE is IGNORED
+ 
+ KERNEL_VERSION
+   String like '4.16.18'
+
+   If KERNEL_SOURCE_URL is set, KERNEL_VERSION is IGNORED
+
+   If KERNEL_VERSION has 2 components - e.g. 4.14 - only kernel versions
+   with first two components that match are considered
+
+   If KERNEL_VERSION has less than 2 or more than 2 components, only
+   kernel versions that match exactly are considered
+
+   If KERNEL_VERSION is set, and not found in kernel.org JSON, will
+   attempt to find download URL from kernel snapshots on
+   git.kernel.org. In this case, KERNEL_TYPE is ignored
+   
+ KERNEL_SOURCE_URL
+   If set, kernel source is downloaded from this URL
+   URL may be a git repository, or a URL for a tar | tar.{gz|xz|bz2}
+   If URL is NOT a git repository, URL MUST end in one of the following:
+       .tar
+       .tar.gz
+       .tar.bz2
+       .tar.xz
+   Only HTTP(S) URLs are supported - no ftp etc
+
+   This can be used for:
+       - github repositories
+       - Download of specific versions from kernel.org
+
+   If KERNEL_SOURCE_URL is set, KERNEL_TYPE and KERNEL_VERSION are IGNORED
+
+GIT_CLONE_COMMAND
+    Sets command to clone a repository
+    Default is "git clone --depth 1"
+
+ Variables driving which steps are performed:
+ -------------------------------------------
+
+ KERNEL__BUILD_SRC_PKG
+   By default kernel source packages _ARE_ built
+   If KERNEL__BUILD_SRC_PKG = "no" - kernel source packages are not built
+
+ KERNEL__BUILD_META_PACKAGE
+   By default meta-packages (cherrytux-image, cherrytux-headers) _ARE_ built
+   If KERNEL__BUILD_META_PACKAGE = "no", meta-packages are NOT built
+
+ KERNEL__APPLY_PATCHES
+   By default patches are applied if found
+   If KERNEL__APPLY_PATCHES = "no", patches are not looked for or applied
+
+ KERNEL__DO_LOCAL_UPLOAD
+   By default upload to local debrepo (reprepro) will be attempted
+   If KERNEL__DO_LOCAL_UPLOAD = "no", local upload will NOT be attempted
+
+ Variables specifying paths:
+ --------------------------
+
+ KERNEL_CONFIG
+   Full path to file with kernel config to use as starting point
+   If it is older than kernel version being compiled, new 'questions' will
+   be answered AUTOMATICALLY as follows:
+       If an option can be a module, it will be chosen to be a module
+       If an option CANNOT be a module, default option is chosen
+
+ KERNEL_CONFIG_PREFS
+   Full path to file containing options to set in kernel config
+   After first pass at 'make oldconfig', these options will be set and
+   'make oldconfig' will be called again
+   File format:
+       - Lines starting with '#' are ignored
+       - Blank lines are ignored
+       - Valid lines should contain:
+           name=value
+         OR
+           name = value
+       - (python) Regex is: '^\s_(?P\S+)\s_=\s*(?P\S+)'
+
+ KERNEL_PATCH_DIR
+   Full path to directory containing kernel patches
+   If KERNEL__APPLY_PATCHES = "no", KERNEL_PATCH_DIR is ignored
+   If KERNEL_PATCH_DIR is not a directory, no patches are applied
+
+   -   Each file in directory can contain one or more patches
+   -   Patches are applied in file (lexicographic order)
+   -   Patch files could be named starting with '001_', '002_' ... to
+       visiually indicate patch order, but this is not required. Patches
+       are applied by considering patch files in order as listed by 'for i
+       in *'
+   -   Patch filenames ending in '.optional' are applied if possible.
+       Failures are ignored
+   -   Patch filenames NOT ending in '.optional' are considered mandatory.
+       Kernel build FAILS if patch does not apply.
+   -   Mandatory patch files can end in '.patch', although this is not
+       required
+
+ NUM_THREADS
+   Number of threads to use
+   If NUM_THREADS is NOT set, by default number of threads is set to be
+   available_cores - 1 with a minimum of 1 thread
+
+   If NUM_THREADS is set and is LARGER than what the default would be,
+   NUM_THREADS is IGNORED
+
+ META_PKGNAME_PREFIX
+   Defaults to 'cherrytux'
+   Shouldn't have to change this
+
+ 
+ Variables used in metapackage_build.sh and ppa_upload.sh:
+ --------------------------------------------------------
+ 
+ DEBEMAIL
+   Just the email - no full name - e.g. my.email@example.com
+ 
+ DEBFULLNAME
+   Just the full name - e.g. "My FullName"
+
+ If BOTH DEBEMAIL AND DEBFULLNAME are set, Maintainer field of source
+ package is set using DEBEMAIL and DEBFULLNAME
+ Source package build and PPA Upload will work even if these are not set
+ 
+DISABLE_GPG_PASSPHRASE_CACHING
+    Set DISABLE_GPG_PASSPHRASE_CACHING=yes to disable passphrase
+    caching by gpg
+ 
+ Variables used in ppa_upload.sh (ONLY):
+ --------------------------------------
+
+ DPUT_PPA_NAME
+   No default value
+   If not set, source package may be built, but will NOT be uploaded
+   In addition to setting DPUT_PPA_NAME, you need to:
+       - Have SSH Keys configured on your Launchpad account FOR THE MACHINE
+           where patch_and_build_kernel.sh is running
+       - Have ~/.dput.cf setup correctly - see sample_dput.cf in the same
+           directory as patch_and_build_kernel.sh
+
+ GPG_DEFAULT_KEY_SET
+   Default: Empty
+   Indicates default_key is set in ~/gnupg/gpg.conf
+   If not empty, source package signing will be attempted even if
+       GPG_KEYID is not set
+
+ GPG_KEYID
+   No default value
+   Should be a gpg key fingerprint
+   If not set:
+       - source package will not be signed
+       - An unsigned package will never be accepted on Launchpad.Net
+       - Because of this, patch_and_build_kernel.sh will BUILD source
+         package, but will NOT upload using dput
+
+
+ Variables used in local_upload.sh (ONLY):
+ ----------------------------------------
+
+ LOCAL_DEB_REPO_DIR
+   Full path to local repository
+   If unset or if not a directory, llocal_upload.sh is not called
+
+ LOCAL_DEB_DISTS
+   Space-separated list of dists - e.g. "xenial bionic"
+   If unset will default to dist on local machine (from lsb_release -c)
+
+
+
+
+-------------------------------------------------------------------------
+ Directory layout:
+-------------------------------------------------------------------------
+ Only need to set KERNEL_BUILD_DIR
+ WITHIN KERNEL_BUILD_DIR, a directory named __kernel_build will be used
+ This directory (kernel_build) will be DELETED AND RE-CREATED
+
+
+ KERNEL_BUILD_DIR   - user-specified, defaults to SCRIPT_DIR
+ │                  - Except directory __kernel_build, no other file or
+ │                    directory under KERNEL_BUILD_DIR is changed or
+ │                    created or deleted
+ │
+ └── __kernel_build - DELETED and RE-CREATED
+     │              - KB_TOP_DIR is set to this
+     │
+     ├── build      - Contains kernel DEBs
+     │   │          - BUILD_DIR_PARENT is set to this
+     │   │
+     │   └── linux  - Contains Linux kernel source
+     │              - Contains .config
+     │              - BUILD_DIR is set to this
+     │
+     ├── debs       - Contains kernel DEBs
+     │              - All files from top level of BUILD_DIR_PARENT are
+     │                MOVED to this dir after compilationis complete
+     │
+     ├── debug      - Contains debug output (ONLY)
+     │   │          - DEBUG_DIR is set to this
+     │   │
+     │   ├── build_meta.out   - output of metapackage_build.sh (ONLY)
+     │   │                    - META_OUT_FILENAME is set to this
+     │   │
+     │   ├── chosen.out       - output of UPDATE_CONFIG_SCRIPT (ONLY)
+     │   │                    - CHOSEN_OUT_FILENAME is set to this
+     │   │
+     │   ├── compile.out      - output of kernel compilation (ONLY)
+     │   │                    - COMPILE_OUT_FILENAME is set to this
+     │   │
+     │   ├── silentconfig.out - output of make oldconfig or
+     │   │                      make silentoldconfig (ONLY)
+     │   │                    - SILENTCONFIG_OUT_FILENAME is set to this
+     │   │
+     │   └── start_end.out    - start and end timestamps (ONLY)
+     │                        - START_END_TIME_FILE is set to this
+     │
+     └── meta - metapackage binary and source DEBs (ONLY)
+              - METAPACKAGE_DIR is set to this
+-------------------------------------------------------------------------

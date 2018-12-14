@@ -25,7 +25,9 @@ INTEL_SOC_PMIC_CHTWC=y
 # Disable new AMDGPU Display Engine - it breaks DisplayPort
 # on AMD Radeon RX460
 DRM_AMD_DC=n
-# Next one is needed only till systemd v235 bug fix
+# Following are needed only till systemd v235 bug fix
 # Avoid errors like '... egress BPF program ...'
 # See https://github.com/systemd/systemd/issues/7054
 CGROUP_BPF=y
+# Make bluetooth work WITHOUT rfkill patch!
+CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
