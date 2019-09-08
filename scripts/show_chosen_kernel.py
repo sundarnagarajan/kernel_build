@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+# Works in Python 2|3
 '''
 Following environment variables can be set to override default logic:
     KERNEL_CONFIG    : FULL PATH to existing config file
