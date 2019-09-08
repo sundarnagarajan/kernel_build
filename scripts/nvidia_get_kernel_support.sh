@@ -13,7 +13,8 @@ CHANGELOG_URL='https://www.virtualbox.org/wiki/Changelog'
 LATEST_DRIVER_URL="https://www.nvidia.com/object/unix.html"
 # DRIVER_SELECTOR is applied using grep - FIRST matching line
 DRIVER_SELECTOR="Latest Long Lived Branch Version"
-DRIVER_PAGE_URL_PREFIX="https:"
+# DRIVER_PAGE_URL_PREFIX="https:"
+DRIVER_PAGE_URL_PREFIX=""
 # KERNEL_UPDATE_SELECTOR_REGEX is a Regex
 KERNEL_UPDATE_SELECTOR_REGEX="Linux [kK]ernel \d+\.\d+"
 KERNEL_SELECTOR_REGEX_NOVER='Linux [kK]ernel'
@@ -51,12 +52,13 @@ function get_installed_nvidia_version() {
 }
 
 function get_latest_driver_version() {
-    curl -s "$LATEST_DRIVER_URL" | grep "$DRIVER_SELECTOR" | head -1 | perl -Wnl -e "/href=\".*?\">(.*?)<\/A>/ and print \$1"
+    curl -s -L "$LATEST_DRIVER_URL" | grep "$DRIVER_SELECTOR" | head -1 | perl -Wnl -e "/href=\".*?\">(.*?)<\/A>/ and print \$1"
 }
 
 
 function get_driver_page_url() {
-    curl -s "$LATEST_DRIVER_URL" | grep "$DRIVER_SELECTOR" | head -1 | perl -Wnl -e "/href=\"(.*?)\"/ and print \"${DRIVER_PAGE_URL_PREFIX}\${1}\"" 2>/dev/null
+    # curl -s -L "$LATEST_DRIVER_URL" | grep "$DRIVER_SELECTOR" | head -1 | perl -Wnl -e "/href=\"(.*?)\"/ and print \"${DRIVER_PAGE_URL_PREFIX}\${1}\"" 2>/dev/null
+    curl -s -L "$LATEST_DRIVER_URL" | grep "$DRIVER_SELECTOR" | head -1 | perl -Wnl -e "/href=\"(.*?)\"/ and print \"${DRIVER_PAGE_URL_PREFIX}\$1\"" 2>/dev/null
 }
 
 function get_kernel_update_changes() {
@@ -64,12 +66,12 @@ function get_kernel_update_changes() {
     # $2: Kernel version or ""
     local url="$1"
     local kver=$2
-    links -width 400 -dump "$url" | grep --color -P "$KERNEL_UPDATE_SELECTOR_REGEX"
 
     if [ -n "$kver" ]; then
-        links -width 400 -dump "$url" | grep --color -P "$KERNEL_SELECTOR_REGEX_NOVER $kver"
+        echo "links -width 400 -dump \"$url\" | grep --color -P \"$KERNEL_UPDATE_SELECTOR_REGEX\""
+        links -width 400 -dump "$url" | grep --color -P "$KERNEL_UPDATE_SELECTOR_REGEX"
     else
-        links -width 400 -dump "$url" | grep --color -P "$KERNEL_SELECTOR_REGEX"
+        links -width 400 -dump "$url" | grep --color -P "$KERNEL_SELECTOR_REGEX_NOVER $kver"
     fi
 
     return $?   # Whether grep matched
