@@ -1367,7 +1367,7 @@ function ppa_upload_build_src_changes {
     for f in ${PPA_UPLOAD_DSC_FILE} linux/debian/control
     do
         # Update Build-depends
-        sed -i '/^Build-Depends: / s/$/, libelf-dev, libncurses5-dev, libssl-dev, libfile-fcntllock-perl, fakeroot, bison, flex/' $f
+        sed -i '/^Build-Depends: / s/$/, libelf-dev, libncurses5-dev, libssl-dev, libfile-fcntllock-perl, fakeroot, bison, flex, rsync/' $f
         # Update Maintainer
         if [ -n "$PPA_MAINTAINER" ]; then
             sed -i "s/^Maintainer: .*$/Maintainer: $PPA_MAINTAINER/" $f
