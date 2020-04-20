@@ -40,9 +40,9 @@ function get_kernel_update_changes() {
     fi
 
     if [ -n "$kver" ]; then
-        links -width 400 -dump "$url" | grep -vP '^\s+$' | sed -e "s/^/Virtualbox ${ver}: /" | grep 'Linux host' | grep --color -P "$KERNEL_SELECTOR_REGEX_NOVER $kver"
+        links -width 400 -dump "$url" | grep -vP '^\s+$' | sed -e "s/^/Virtualbox ${ver}: /" | egrep 'Linux (host|guest)' | grep --color -P "$KERNEL_SELECTOR_REGEX_NOVER $kver"
     else
-        links -width 400 -dump "$url" | grep -vP '^\s+$' | sed -e "s/^/Virtualbox ${ver}: /" | grep 'Linux host' | grep --color -P "$KERNEL_SELECTOR_REGEX"
+        links -width 400 -dump "$url" | grep -vP '^\s+$' | sed -e "s/^/Virtualbox ${ver}: /" | egrep 'Linux (host|guest)' | grep --color -P "$KERNEL_SELECTOR_REGEX"
     fi
 }
 

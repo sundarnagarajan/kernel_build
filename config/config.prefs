@@ -8,6 +8,8 @@
 #
 # Make USB_SERIAL a MODULE so that module options can be set
 USB_SERIAL=m
+# Wireguard
+CONFIG_WIREGUARD=m
 # Enable staging drivers
 STAGING=y
 # Modules for Intel Cherry Trail platform
@@ -31,3 +33,9 @@ DRM_AMD_DC=n
 CGROUP_BPF=y
 # Make bluetooth work WITHOUT rfkill patch!
 CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+# For kernel 5.4+ with virtualbox-6.1
+# See https://www.virtualbox.org/ticket/18945#comment:19
+# Not enabled yet - virtualbox-6.1 works without these
+#
+# CONFIG_UNUSED_SYMBOLS=n
+# CONFIG_TRIM_UNUSED_KSYMS=n
