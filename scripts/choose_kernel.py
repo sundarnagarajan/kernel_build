@@ -124,7 +124,7 @@ def get_chosen_kernel_url(verbose=False):
             )
             if kurl:
                 if verbose:
-                    print('Based on settings, will choose %s (%s)' % (
+                    print('Based on settings, will choose: %s (%s)' % (
                         kurl.kver, kurl.ktype
                     ))
             else:
@@ -135,7 +135,7 @@ def get_chosen_kernel_url(verbose=False):
                 )
                 if kurl:
                     if verbose:
-                        print('Based on settings, will choose %s (%s)' % (
+                        print('Based on settings, will choose: %s (%s)' % (
                             kurl.kver, kurl.ktype
                         ))
                 else:
