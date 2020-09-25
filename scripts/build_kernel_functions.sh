@@ -488,7 +488,7 @@ function set_vars {
 
     KERNEL_BUILD_TARGET=deb-pkg
     if [ "$KERNEL__BUILD_SRC_PKG" = "no" ]; then
-        echo "Not building source packages: KERNEL__BUILD_SRC_PKG = $KERNEL__BUILD_SRC_PKG"
+        # echo "Not building source packages: KERNEL__BUILD_SRC_PKG = $KERNEL__BUILD_SRC_PKG"
         KERNEL_BUILD_TARGET=bindeb-pkg
     fi
     readonly KERNEL_BUILD_TARGET
@@ -579,6 +579,13 @@ function show_vars() {
     printf "%-24s : %s\n" "KERNEL_TYPE" "${KERNEL_TYPE:-not set}"
     printf "%-24s : %s\n" "KERNEL_BUILD_ZFS" "${KERNEL_BUILD_ZFS:-not set}"
     printf "%-24s : %s\n" "KERNEL_VERSION" "${KERNEL_VERSION:-not set}"
+    printf "%-24s : %s\n" "Threads" "${THREADS_USED:-not set}"
+    printf "%-24s : %s\n" "Build target" "${KERNEL_BUILD_TARGET:-not set}"
+    printf "%-24s : %s\n" "Applying patches" "${KERNEL__APPLY_PATCHES:-yes}"
+    printf "%-24s : %s\n" "Building source packages" "${KERNEL__BUILD_SRC_PKG:-yes}"
+    printf "%-24s : %s\n" "Build metapackages" "${KERNEL__BUILD_META_PACKAGE:-yes}"
+    printf "%-24s : %s\n" "Local repository upload" "${KERNEL__DO_LOCAL_UPLOAD:-yes}"
+
     printf "%-24s : %s\n" "KERNEL_BUILD_DIR" "${KERNEL_BUILD_DIR:-not set}"
     printf "%-24s : %s\n" "BUILD_DIR_PARENT" "${BUILD_DIR_PARENT:-not set}"
     printf "%-24s : %s\n" "BUILD_DIR" "${BUILD_DIR:-not set}"
@@ -589,8 +596,6 @@ function show_vars() {
 
     printf "%-24s : %s\n" "Config file" "${CONFIG_FILE_PATH:-not set}"
     printf "%-24s : %s\n" "Config prefs" "${KERNEL_CONFIG_PREFS:-not set}"
-    printf "%-24s : %s\n" "Threads" "${THREADS_USED:-not set}"
-    printf "%-24s : %s\n" "Build target" "${KERNEL_BUILD_TARGET:-not set}"
 
     printf "%-24s : %s\n" "Config choices output" "$CHOSEN_OUT_FILEPATH"
     printf "%-24s : %s\n" "make oldconfig output" "$OLDCONFIG_OUT_FILEPATH"
@@ -599,10 +604,6 @@ function show_vars() {
     printf "%-24s : %s\n" "Metapackage build output" "$METAPKG_BUILD_OUT_FILEPATH"
     printf "%-24s : %s\n" "Local upload output" "$LOCAL_UPLOAD_BUILD_OUT_FILEPATH"
 
-    printf "%-24s : %s\n" "Applying patches" "${KERNEL__APPLY_PATCHES:-yes}"
-    printf "%-24s : %s\n" "Building source packages" "${KERNEL__BUILD_SRC_PKG:-yes}"
-    printf "%-24s : %s\n" "Build metapackages" "${KERNEL__BUILD_META_PACKAGE:-yes}"
-    printf "%-24s : %s\n" "Local repository upload" "${KERNEL__DO_LOCAL_UPLOAD:-yes}"
 }
 
 function read_config {
@@ -1707,4 +1708,5 @@ if [ "$1" = "-h" -o "$1" = "--help" ]; then
 fi
 set_vars
 show_vars
+echo ""
 $CHECK_REQD_PKGS_SCRIPT || exit 1
