@@ -113,7 +113,7 @@ def get_chosen_kernel_url(verbose=False):
 
     if kurl:
         if verbose:
-            print('Will choose: %s (%s)' % (
+            print('Based on defaults, will choose: %s (%s)' % (
                 kurl.kver, kurl.ktype))
 
         if (override_ktype or override_kver):
