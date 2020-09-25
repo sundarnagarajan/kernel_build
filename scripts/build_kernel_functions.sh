@@ -1029,7 +1029,10 @@ function build_kernel {
     echo "------------------------------------------------------------------------------"
     echo "Kernel DEBS: (in $(readlink -f $DEB_DIR))"
     cd "${DEB_DIR}"
-    ls -1 *.deb | sed -e "s/^/${INDENT}/"
+    for f in *.deb;
+    do
+        echo "$(dpkg-deb -W --showformat='${Package} ${Version}\n' $f) $f"
+    done | sort | column -t | sed -e "s/^/${INDENT}/"
     echo "------------------------------------------------------------------------------"
 
 
