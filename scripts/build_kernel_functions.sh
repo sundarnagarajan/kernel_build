@@ -77,7 +77,7 @@ SCRIPT_DIR="${PROG_DIR}"
 # The list below is also THE set of config variables that are used
 # (except KERNEL_BUILD_CONFIG)
 #-------------------------------------------------------------------------
-CONFIG_VARS="KERNEL_BUILD_CONFIG DEBEMAIL DEBFULLNAME KERNEL_BUILD_DIR DPUT_PPA_NAME GPG_DEFAULT_KEY_SET KERNEL_TYPE LOCAL_DEB_REPO_DIR LOCAL_DEB_DISTS META_PKGNAME_PREFIX NUM_THREADS GPG_KEYID KERNEL_VERSION KERNEL_CONFIG KERNEL_PATCH_DIR KERNEL_CONFIG_PREFS KERNEL__BUILD_SRC_PKG KERNEL__BUILD_META_PACKAGE KERNEL__DO_LOCAL_UPLOAD KERNEL__APPLY_PATCHES KERNEL_SOURCE_URL GIT_CLONE_COMMAND DISABLE_GPG_PASSPHRASE_CACHING"
+CONFIG_VARS="KERNEL_BUILD_CONFIG DEBEMAIL DEBFULLNAME KERNEL_BUILD_DIR DPUT_PPA_NAME GPG_DEFAULT_KEY_SET KERNEL_TYPE LOCAL_DEB_REPO_DIR LOCAL_DEB_DISTS META_PKGNAME_PREFIX NUM_THREADS GPG_KEYID KERNEL_VERSION KERNEL_CONFIG KERNEL_PATCH_DIR KERNEL_CONFIG_PREFS KERNEL__BUILD_SRC_PKG KERNEL__BUILD_META_PACKAGE KERNEL__DO_LOCAL_UPLOAD KERNEL__APPLY_PATCHES KERNEL_SOURCE_URL GIT_CLONE_COMMAND DISABLE_GPG_PASSPHRASE_CACHING KERNEL_BUILD_ZFS"
 readonly CONFIG_VARS
 for v in $CONFIG_VARS
 do
@@ -577,6 +577,7 @@ function show_vars() {
     # readonly -p | cut -d' ' -f3- | cut -d'=' -f1 | sed -e "s/^/    /" | egrep -v '(BASH*|EUID|PPID|SHELLOPTS|UID|UPDATE_CONFIG_SCRIPT)'
 
     printf "%-24s : %s\n" "KERNEL_TYPE" "${KERNEL_TYPE:-not set}"
+    printf "%-24s : %s\n" "KERNEL_BUILD_ZFS" "${KERNEL_BUILD_ZFS:-not set}"
     printf "%-24s : %s\n" "KERNEL_VERSION" "${KERNEL_VERSION:-not set}"
     printf "%-24s : %s\n" "KERNEL_BUILD_DIR" "${KERNEL_BUILD_DIR:-not set}"
     printf "%-24s : %s\n" "BUILD_DIR_PARENT" "${BUILD_DIR_PARENT:-not set}"
@@ -980,72 +981,6 @@ function run_make_oldconfig {
     return $ret
 }
 
-function unused_add_zfs_to_kernel() {
-    #
-    # Uses:
-    #   COMPILE_OUT_FILEPATH
-    #   MAKE_THREADED
-    #   BUILD_DIR
-    #   BUILD_DIR_PARENT
-
-    local oldpwd="$(pwd)"
-
-    cd $BUILD_DIR
-    SECONDS=0
-
-    $MAKE_THREADED -j32 prepare scripts 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    cd  "${BUILD_DIR_PARENT}"
-    \rm -rf zfs
-    local zfs_github_url='https://github.com/openzfs/zfs.git'
-    local latest_tag=$(git ls-remote --tags --quiet --refs $zfs_github_url | tail -1 | cut -d/ -f3)
-    git clone --depth 1 --branch "$latest_tag" "$zfs_github_url" zfs
-    cd zfs
-
-    # Apply ZFS patches
-    local ZFS_PATCH_DIR_PATH="$(readlink -m ${BUILD_DIR_PARENT}/../../zfs_patches)"
-    if [ -z "$ZFS_PATCH_DIR_PATH" ]; then
-        echo "ZFS_PATCH_DIR_PATH not set. Not applying any patches"
-        return
-    fi
-    if [ ! -d "$ZFS_PATCH_DIR_PATH" ]; then
-        echo "Not a directory: ZFS_PATCH_DIR_PATH: $ZFS_PATCH_DIR_PATH"
-        echo "Not applying any patches"
-        return
-    fi
-    local num_patches=$(ls -1 "$ZFS_PATCH_DIR_PATH"/ | wc -l)
-    if [ $num_patches -eq 0 ]; then
-        echo "No patches to apply"
-        return
-    fi
-    echo "Number of patches to apply: $num_patches"
-    ls -1 "$ZFS_PATCH_DIR_PATH"/* | while read patch_file
-    do
-        local base_patch_file=$(basename "$patch_file")
-        local opt_stripped=$(basename "$patch_file" .optional)
-        local mandatory=1
-        if [ "$base_patch_file" = "${opt_stripped}.optional" ]; then
-            mandatory=0
-        fi
-        if [ $mandatory -eq 0 ]; then
-            echo "Applying optional patch: $base_patch_file:"
-        else
-            echo "Applying mandatory patch: $base_patch_file:"
-        fi
-        local patch_out=$(patch --forward -r - -p1 < $patch_file 2>&1)
-        patch_ret=$?
-        echo "$patch_out" | sed -e "s/^/${INDENT}/"
-        if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
-            echo "Mandatory patch failed"
-            cd $oldpwd
-            return 1
-        fi
-    done
-
-    sh autogen.sh 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    ./configure --enable-systemd --prefix=/ --libdir=/lib --includedir=/usr/include --datarootdir=/usr/share --enable-linux-builtin=yes --with-linux="${BUILD_DIR}" --with-linux-obj="${BUILD_DIR}" 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    ./copy-builtin "$BUILD_DIR" 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
-    cd "$oldpwd"
-}
 
 function build_kernel {
     #
@@ -1098,6 +1033,106 @@ function build_kernel {
 
 
     cd "$oldpwd"
+}
+
+function build_zfs() {
+    # $1: ZFS_BUILD_DIR - must exist - will create / empty __zfs_build dir within ZFS_BUILD_DIR
+    # $2: ZFS_LINUX_DIR - must exist (and contain linux kernel source)
+    if [ "$KERNEL_BUILD_ZFS" != "yes" ]; then
+        echo "Not building ZFS because KERNEL_BUILD_ZFS not set to 'yes' (${KERNEL_BIULD_ZFS:-not set})"
+        return 0
+    fi
+    if [ -z "$2" ]; then
+        echo "Usage: rebuild_zfs <ZFS_BUILD_DIR> <ZFS_LINUX_DIR> - both must be existing dirs"
+        return 1
+    fi
+
+    local zfs_github_url='https://github.com/openzfs/zfs.git'
+    local latest_tag=$(git ls-remote --tags --quiet --refs $zfs_github_url | tail -1 | cut -d/ -f3)
+    local MAKE_TARGETS="deb-dkms deb-utils"
+    local kernel_deb_list='zfs-dkms*.deb'
+    local userspace_deb_list='libnvpair*.deb libuutil*.deb libzfs*.deb libzpool*.deb zfs_*.deb zfs-initramfs*'
+
+    local ZFS_BUILD_DIR=$1
+    local ZFS_LINUX_DIR=$2
+
+    ZFS_BUILD_DIR=$(readlink -m "$ZFS_BUILD_DIR")
+    ZFS_LINUX_DIR=$(readlink -m "$ZFS_LINUX_DIR")
+    if [ ! -d "$ZFS_BUILD_DIR" ]; then
+        echo "Not a directory: $ZFS_BUILD_DIR"
+        return 2
+    fi
+    if [ ! -d "$ZFS_LINUX_DIR" ]; then
+        echo "Not a directory: $ZFS_LINUX_DIR"
+        return 3
+    fi
+    ZFS_BUILD_DIR="$ZFS_BUILD_DIR"/__zfs_build
+    local ZFS_KERNEL_DEB_DIR="$ZFS_BUILD_DIR"/zfs_kernel_debs
+    local ZFS_USERSPACE_DEB_DIR="$ZFS_BUILD_DIR"/zfs_userspace_debs
+    local ZFS_DEBUG_DIR="$ZFS_BUILD_DIR"/debug
+    for v in MAKE_TARGETS ZFS_BUILD_DIR ZFS_LINUX_DIR ZFS_KERNEL_DEB_DIR ZFS_USERSPACE_DEB_DIR 
+    do
+        printf "%-24s %s\n" "$v" "${!v}"
+    done
+    echo ""
+
+    echo "Cleaning up"
+    \rm -rf "$ZFS_BUILD_DIR"
+    mkdir -p "$ZFS_BUILD_DIR" "$ZFS_KERNEL_DEB_DIR" "$ZFS_USERSPACE_DEB_DIR" "$ZFS_DEBUG_DIR"
+
+    local fn_ret=0
+
+    cd "${ZFS_BUILD_DIR}"
+    echo "Cloning ZFS $latest_tag from github"
+    git clone --depth 1 --branch "$latest_tag" "$zfs_github_url" zfs 1>>"$COMPILE_OUT_FILEPATH" 2>&1 || return 4
+
+    cd "${ZFS_BUILD_DIR}/zfs"
+    echo "Running autogen.sh"
+    sh autogen.sh 1>>"$COMPILE_OUT_FILEPATH" 2>&1 || return 5
+    echo "Running configure"
+    if [ -n "$ZFS_LINUX_DIR" -a -d "$ZFS_LINUX_DIR" ]; then
+        ./configure --enable-systemd --with-linux="${ZFS_LINUX_DIR}" --with-linux-obj="${ZFS_LINUX_DIR}" 1>>"$COMPILE_OUT_FILEPATH" 2>&1 || return 6
+    else
+        ./configure --enable-systemd 1>>"$COMPILE_OUT_FILEPATH" 2>&1 || return 7
+    fi
+
+    echo "make $MAKE_TARGETS"
+    make -j$(nproc) $MAKE_TARGETS 1>>"$COMPILE_OUT_FILEPATH" 2>&1 || return 8
+
+    \mv -f $kernel_deb_list "$ZFS_KERNEL_DEB_DIR"/ 2>/dev/null
+    \mv -f $userspace_deb_list "$ZFS_USERSPACE_DEB_DIR"/ 2>/dev/null
+
+    echo ""
+
+    echo "ZFS DKMS kernel DEBS built (and required):"
+    cd "$ZFS_KERNEL_DEB_DIR"
+    for pat in $kernel_deb_list
+    do
+        local deb_file=$(ls $pat 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            echo "Required DEB not found: $pat" | sed -e 's/^/    /'
+            fn_ret=9
+            continue
+        fi
+    done
+    for f in *; do printf "%s : %s\n" "$(dpkg-deb -W --showformat='${Package}' $f)" "$f"; done | column -t | sed -e 's/^/    /'
+    echo "ZFS userspace DEBS built (and required):"
+    cd "$ZFS_USERSPACE_DEB_DIR"
+    for pat in $userspace_deb_list
+    do
+        local deb_file=$(ls $pat 2>/dev/null)
+        if [ $? -ne 0 ]; then
+            echo "Required DEB not found: $pat" | sed -e 's/^/    /'
+            fn_ret=9
+            continue
+        fi
+    done
+    for f in *; do printf "%s : %s\n" "$(dpkg-deb -W --showformat='${Package}' $f)" "$f"; done | column -t | sed -e 's/^/    /'
+
+    echo ""
+    echo "Built version $latest_tag"
+    echo ""
+    return $fn_ret
 }
 
 function old_unused_build_kernel {

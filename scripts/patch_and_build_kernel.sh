@@ -28,4 +28,5 @@ fi
 apply_patches || exit 1
 restore_kernel_config || exit 1
 build_kernel || exit 1
+build_zfs "$KERNEL_BUILD_DIR" "$BUILD_DIR" || exit 1
 do_local_upload
