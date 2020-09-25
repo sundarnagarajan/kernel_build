@@ -980,7 +980,127 @@ function run_make_oldconfig {
     return $ret
 }
 
+function unused_add_zfs_to_kernel() {
+    #
+    # Uses:
+    #   COMPILE_OUT_FILEPATH
+    #   MAKE_THREADED
+    #   BUILD_DIR
+    #   BUILD_DIR_PARENT
+
+    local oldpwd="$(pwd)"
+
+    cd $BUILD_DIR
+    SECONDS=0
+
+    $MAKE_THREADED -j32 prepare scripts 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    cd  "${BUILD_DIR_PARENT}"
+    \rm -rf zfs
+    local zfs_github_url='https://github.com/openzfs/zfs.git'
+    local latest_tag=$(git ls-remote --tags --quiet --refs $zfs_github_url | tail -1 | cut -d/ -f3)
+    git clone --depth 1 --branch "$latest_tag" "$zfs_github_url" zfs
+    cd zfs
+
+    # Apply ZFS patches
+    local ZFS_PATCH_DIR_PATH="$(readlink -m ${BUILD_DIR_PARENT}/../../zfs_patches)"
+    if [ -z "$ZFS_PATCH_DIR_PATH" ]; then
+        echo "ZFS_PATCH_DIR_PATH not set. Not applying any patches"
+        return
+    fi
+    if [ ! -d "$ZFS_PATCH_DIR_PATH" ]; then
+        echo "Not a directory: ZFS_PATCH_DIR_PATH: $ZFS_PATCH_DIR_PATH"
+        echo "Not applying any patches"
+        return
+    fi
+    local num_patches=$(ls -1 "$ZFS_PATCH_DIR_PATH"/ | wc -l)
+    if [ $num_patches -eq 0 ]; then
+        echo "No patches to apply"
+        return
+    fi
+    echo "Number of patches to apply: $num_patches"
+    ls -1 "$ZFS_PATCH_DIR_PATH"/* | while read patch_file
+    do
+        local base_patch_file=$(basename "$patch_file")
+        local opt_stripped=$(basename "$patch_file" .optional)
+        local mandatory=1
+        if [ "$base_patch_file" = "${opt_stripped}.optional" ]; then
+            mandatory=0
+        fi
+        if [ $mandatory -eq 0 ]; then
+            echo "Applying optional patch: $base_patch_file:"
+        else
+            echo "Applying mandatory patch: $base_patch_file:"
+        fi
+        local patch_out=$(patch --forward -r - -p1 < $patch_file 2>&1)
+        patch_ret=$?
+        echo "$patch_out" | sed -e "s/^/${INDENT}/"
+        if [ $mandatory -eq 1 -a $patch_ret -ne 0 ]; then
+            echo "Mandatory patch failed"
+            cd $oldpwd
+            return 1
+        fi
+    done
+
+    sh autogen.sh 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    ./configure --enable-systemd --prefix=/ --libdir=/lib --includedir=/usr/include --datarootdir=/usr/share --enable-linux-builtin=yes --with-linux="${BUILD_DIR}" --with-linux-obj="${BUILD_DIR}" 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    ./copy-builtin "$BUILD_DIR" 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    cd "$oldpwd"
+}
+
 function build_kernel {
+    #
+    # Uses:
+    #   COMPILE_OUT_FILEPATH
+    #   MAKE_THREADED
+    #   KERNEL_IMAGE_NAME
+    #   KERNEL_BUILD_TARGET
+    #   START_END_TIME_FILEPATH
+    #   DEB_DIR
+    #   OLDCONFIG_OUT_FILEPATH
+    #
+
+    local oldpwd="$(pwd)"
+    cd $BUILD_DIR
+    SECONDS=0
+    \cp -f /dev/null "${COMPILE_OUT_FILEPATH}"
+    local elapsed=''
+
+    show_timing_msg "${START_END_TIME_FILEPATH}" "Kernel build start" "yestee" ""
+    run_make_oldconfig
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && cd "$oldpwd" && return 1
+
+    # Cannot easily write a more comprehensive changelog before building binary debs
+    # debian/changelog is created within scripts/packages/mkdebian which is called
+    # when 'make bindeb-pkg' or 'make deb-pkg'
+    # The text that goes into the changelog (and control files) are hard-coded in
+    # scripts/packages/mkdebian !
+
+    # Directly build ${KERNEL_BUILD_TARGET} (bindeb-pkg or deb-pkg) instead of
+    # first building bzImage, modules ... faster
+    show_timing_msg "${START_END_TIME_FILEPATH}" "Kernel deb build start" "yestee" ""; SECONDS=0
+    $MAKE_THREADED ${KERNEL_BUILD_TARGET} 1>>"${COMPILE_OUT_FILEPATH}" 2>&1
+    [ $? -ne 0 ] && (tail -20 "${COMPILE_OUT_FILEPATH}"; echo ""; echo "See ${COMPILE_OUT_FILEPATH}") && cd "$oldpwd" && return 1
+
+    show_timing_msg "${START_END_TIME_FILEPATH}" "Kernel deb build finished" "yestee" "$(get_hms)"
+    show_timing_msg "${START_END_TIME_FILEPATH}" "Kernel build finished" "notee" ""
+
+    cd  "${BUILD_DIR_PARENT}"
+    find . -maxdepth 1 -type f -exec mv {} ${DEB_DIR}/ \;
+    rm -f "${OLDCONFIG_OUT_FILEPATH}"
+
+    echo "-------------------------- Kernel compile time -------------------------------"
+    cat $START_END_TIME_FILEPATH
+    echo "------------------------------------------------------------------------------"
+    echo "Kernel DEBS: (in $(readlink -f $DEB_DIR))"
+    cd "${DEB_DIR}"
+    ls -1 *.deb | sed -e "s/^/${INDENT}/"
+    echo "------------------------------------------------------------------------------"
+
+
+    cd "$oldpwd"
+}
+
+function old_unused_build_kernel {
     #
     # Uses:
     #   COMPILE_OUT_FILEPATH
