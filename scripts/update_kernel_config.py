@@ -177,19 +177,23 @@ def update_keys(prefs_dict, sc):
     sc-->str: path to scripts/config under Linux source
     Returns-->Nothing
     '''
-    for (k, v) in prefs_dict.items():
-        if v == 'y':
-            CMD = '%s --enable %s' % (sc, k)
-        elif v == 'n':
-            CMD = '%s --disable %s' % (sc, k)
-        elif v == 'm':
-            CMD = '%s --module %s' % (sc, k)
-        else:
-            CMD = '%s --set-val %s %s' % (sc, k, v)
-        try:
-            subprocess.call(CMD, shell=True)
-        except:
-            continue
+    with open(CHOSEN_OUT_FILE, 'a+') as f:
+        for (k, v) in prefs_dict.items():
+            if v == 'y':
+                CMD = '%s --enable %s' % (sc, k)
+            elif v == 'n':
+                CMD = '%s --disable %s' % (sc, k)
+            elif v == 'm':
+                CMD = '%s --module %s' % (sc, k)
+            else:
+                CMD = '%s --set-val %s %s' % (sc, k, v)
+            try:
+                subprocess.call(CMD, shell=True)
+            except:
+                import traceback
+                f.write(traceback.format_exc())
+                f.flush()
+                continue
 
 
 if __name__ == '__main__':
