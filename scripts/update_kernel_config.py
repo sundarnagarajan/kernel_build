@@ -179,11 +179,11 @@ def update_keys(prefs_dict, sc):
     '''
     for (k, v) in prefs_dict.items():
         if v == 'y':
-            CMD = '%s --enable %s %s' % (sc, k)
+            CMD = '%s --enable %s' % (sc, k)
         elif v == 'n':
-            CMD = '%s --disable %s %s' % (sc, k)
+            CMD = '%s --disable %s' % (sc, k)
         elif v == 'm':
-            CMD = '%s --module %s %s' % (sc, k)
+            CMD = '%s --module %s' % (sc, k)
         else:
             CMD = '%s --set-val %s %s' % (sc, k, v)
         try:
