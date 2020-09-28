@@ -191,6 +191,7 @@ def update_keys(prefs_dict, sc):
                 subprocess.call(CMD, shell=True)
             except:
                 import traceback
+                f.write('Exception in update_keys: %s\n' % (CMD,))
                 f.write(traceback.format_exc())
                 f.flush()
                 continue
