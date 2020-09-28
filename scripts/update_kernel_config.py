@@ -187,6 +187,7 @@ def update_keys(prefs_dict, sc):
     '''
     with open(CHOSEN_OUT_FILE, 'a+') as f:
         for (k, v) in prefs_dict.items():
+            '''
             if v == 'y':
                 CMD = '%s --enable %s' % (sc, k)
             elif v == 'n':
@@ -195,6 +196,8 @@ def update_keys(prefs_dict, sc):
                 CMD = '%s --module %s' % (sc, k)
             else:
                 CMD = '%s --set-val %s %s' % (sc, k, v)
+            '''
+            CMD = '%s --set-val %s %s' % (sc, k, v)
             try:
                 subprocess.call(CMD, shell=True)
             except:
@@ -278,6 +281,6 @@ if __name__ == '__main__':
     if still_wrong:
         print('Following kernel config prefs were not set:')
         for (k, v) in still_wrong.items():
-            print('\t%s = |%s| (current: |%s|)' % (k, v, to_change.get(k)))
+            print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
     else:
         print('All your kernel config prefs have been set')
