@@ -166,7 +166,7 @@ def non_matching_keys(prefs_dict, sc):
                 x = x.decode('utf8').strip()
                 v = v.strip()
                 if x != v:
-                    ret[k] = v
+                    ret[k] = x
             except:
                 import traceback
                 f.write('Exception in non_matching_keys: %s\n' % (CMD,))
