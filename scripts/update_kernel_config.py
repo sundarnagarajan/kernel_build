@@ -151,7 +151,7 @@ def get_prefs(f):
     return ret
 
 
-def non_matching_keys(prefs_dict, sc):
+def non_matching_keys(prefs_dict, sc, show_source=True):
     '''
     prefs_dict-->dict: returned by get_prefs()
     sc-->str: path to scripts/config under Linux source
@@ -166,7 +166,10 @@ def non_matching_keys(prefs_dict, sc):
                 x = x.decode('utf8').strip()
                 v = v.strip()
                 if x != v:
-                    ret[k] = x
+                    if show_source:
+                        ret[k] = v
+                    else:
+                        ret[k] = x
             except:
                 import traceback
                 f.write('Exception in non_matching_keys: %s\n' % (CMD,))
@@ -254,7 +257,7 @@ if __name__ == '__main__':
         print('No kernel config prefs found')
         exit(0)
 
-    to_change = non_matching_keys(prefs_dict, SCRIPTS_CONFIG)
+    to_change = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=True)
     if not to_change:
         print('All your kernel config prefs are already set')
         exit(0)
@@ -271,7 +274,7 @@ if __name__ == '__main__':
         print('Command failed: %s' % (CMD_AND_ARGS,))
         exit(ret)
 
-    still_wrong = non_matching_keys(to_change, SCRIPTS_CONFIG)
+    still_wrong = non_matching_keys(to_change, SCRIPTS_CONFIG, show_source=False)
     if still_wrong:
         print('Following kernel config prefs were not set:')
         for (k, v) in still_wrong.items():
