@@ -188,8 +188,12 @@ def update_keys(prefs_dict, sc):
     '''
     with open(CHOSEN_OUT_FILE, 'a+') as f:
         for (k, v) in prefs_dict.items():
-            CMD = '%s --set-val %s %s' % (sc, k, v)
+            UNDEFINE_CMD = '%s -u %s ' % (sc, k)
+            SET_CMD = '%s --set-val %s %s' % (sc, k, v)
             try:
+                CMD = UNDEFINE_CMD
+                subprocess.call(CMD, shell=True)
+                CMD = SET_CMD
                 subprocess.call(CMD, shell=True)
             except:
                 import traceback
