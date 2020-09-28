@@ -268,6 +268,10 @@ if __name__ == '__main__':
         for (k, v) in still_wrong.items():
             print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
 
+    import shutil
+    os.unlink('.config')
+    shutil.copy('.config', '.config.fixed')
+
     # Run make silentoldconfig AGAIN - some new modules may have been enabled
     ret = answer_questions(
         CMD_AND_ARGS, SILENT_OUT_FILE, chosen_out_file=CHOSEN_OUT_FILE)
