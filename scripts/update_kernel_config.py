@@ -274,7 +274,7 @@ if __name__ == '__main__':
         print('Command failed: %s' % (CMD_AND_ARGS,))
         exit(ret)
 
-    still_wrong = non_matching_keys(to_change, SCRIPTS_CONFIG, show_source=False)
+    still_wrong = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=False)
     if still_wrong:
         print('Following kernel config prefs were not set:')
         for (k, v) in still_wrong.items():
