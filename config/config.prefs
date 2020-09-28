@@ -21,12 +21,12 @@ STAGING=y
 # kernel command line: fbcon=font:TER16x32
 # See: https://www.kernel.org/doc/Documentation/fb/fbcon.txt
 # ------------------------------------------------------------------------
-CONFIG_FONT_SUPPORT=y
-CONFIG_FONT_8x8=y
-CONFIG_FONT_8x16=y
-CONFIG_FONTS=y
-CONFIG_FONT_TER16x32=y
-CONFIG_FONT_10x18=y
+FONT_SUPPORT=y
+FONT_8x8=y
+FONT_8x16=y
+FONTS=y
+FONT_TER16x32=y
+FONT_10x18=y
 #
 # ------------------------------------------------------------------------
 # Intel Cherry Trail platform
