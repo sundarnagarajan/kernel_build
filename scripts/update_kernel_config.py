@@ -178,8 +178,15 @@ def update_keys(prefs_dict, sc):
     Returns-->Nothing
     '''
     for (k, v) in prefs_dict.items():
-        try:
+        if v == 'y':
+            CMD = '%s --enable %s %s' % (sc, k)
+        elif v == 'n':
+            CMD = '%s --disable %s %s' % (sc, k)
+        elif v == 'm':
+            CMD = '%s --module %s %s' % (sc, k)
+        else:
             CMD = '%s --set-val %s %s' % (sc, k, v)
+        try:
             subprocess.call(CMD, shell=True)
         except:
             continue
