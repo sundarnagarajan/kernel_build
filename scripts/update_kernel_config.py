@@ -188,16 +188,6 @@ def update_keys(prefs_dict, sc):
     '''
     with open(CHOSEN_OUT_FILE, 'a+') as f:
         for (k, v) in prefs_dict.items():
-            '''
-            if v == 'y':
-                CMD = '%s --enable %s' % (sc, k)
-            elif v == 'n':
-                CMD = '%s --disable %s' % (sc, k)
-            elif v == 'm':
-                CMD = '%s --module %s' % (sc, k)
-            else:
-                CMD = '%s --set-val %s %s' % (sc, k, v)
-            '''
             CMD = '%s --set-val %s %s' % (sc, k, v)
             try:
                 subprocess.call(CMD, shell=True)
@@ -272,6 +262,12 @@ if __name__ == '__main__':
 
     # Update keys in config
     update_keys(to_change, SCRIPTS_CONFIG)
+    still_wrong = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=True)
+    if still_wrong:
+        print('Following kernel config prefs were not set after update_keys')
+        for (k, v) in still_wrong.items():
+            print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
+
     # Run make silentoldconfig AGAIN - some new modules may have been enabled
     ret = answer_questions(
         CMD_AND_ARGS, SILENT_OUT_FILE, chosen_out_file=CHOSEN_OUT_FILE)
@@ -281,7 +277,7 @@ if __name__ == '__main__':
 
     still_wrong = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=False)
     if still_wrong:
-        print('Following kernel config prefs were not set:')
+        print('Following prefs were not set after running make silentoldconfig:')
         for (k, v) in still_wrong.items():
             print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
     else:
