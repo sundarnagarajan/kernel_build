@@ -157,10 +157,7 @@ def non_matching_keys(prefs_dict, sc, show_source=True):
     sc-->str: path to scripts/config under Linux source
     Returns-->dict: subset of prefs_dict
     '''
-    pwd = os.getcwd()
     with open(CHOSEN_OUT_FILE, 'a+') as f:
-        os.chdir(BUILD_DIR)
-
         ret = OrderedDict()
         for (k, v) in prefs_dict.items():
             try:
@@ -180,7 +177,6 @@ def non_matching_keys(prefs_dict, sc, show_source=True):
                 f.flush()
                 continue
 
-    os.chdir(pwd)
     return ret
 
 
@@ -190,10 +186,7 @@ def update_keys(prefs_dict, sc):
     sc-->str: path to scripts/config under Linux source
     Returns-->Nothing
     '''
-    pwd = os.getcwd()
     with open(CHOSEN_OUT_FILE, 'a+') as f:
-        os.chdir(BUILD_DIR)
-
         for (k, v) in prefs_dict.items():
             '''
             if v == 'y':
@@ -214,7 +207,6 @@ def update_keys(prefs_dict, sc):
                 f.write(traceback.format_exc())
                 f.flush()
                 continue
-    os.chdir(pwd)
 
 
 if __name__ == '__main__':
@@ -252,6 +244,7 @@ if __name__ == '__main__':
 
     # IMPORTANT - move to Linux kernel source dir
     os.chdir(BUILD_DIR)
+    SCRIPTS_CONFIG = 'scripts/config'
 
     # Run make silentoldconfig once - always required
     ret = answer_questions(
