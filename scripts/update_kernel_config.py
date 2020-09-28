@@ -269,7 +269,10 @@ if __name__ == '__main__':
             print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
 
     import shutil
-    os.unlink('.config.fixed')
+    try:
+        os.unlink('.config.fixed')
+    except:
+        pass
     shutil.copy('.config', '.config.fixed')
 
     # Run make silentoldconfig AGAIN - some new modules may have been enabled
