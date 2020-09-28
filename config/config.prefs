@@ -24,9 +24,9 @@ STAGING=y
 FONT_SUPPORT=y
 FONT_8x8=y
 FONT_8x16=y
-FONTS=y
-FONT_TER16x32=y
-FONT_10x18=y
+#FONTS=y
+#FONT_TER16x32=y
+#FONT_10x18=y
 #
 # ------------------------------------------------------------------------
 # Intel Cherry Trail platform
