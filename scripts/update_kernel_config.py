@@ -157,17 +157,22 @@ def non_matching_keys(prefs_dict, sc):
     sc-->str: path to scripts/config under Linux source
     Returns-->dict: subset of prefs_dict
     '''
-    ret = OrderedDict()
-    for (k, v) in prefs_dict.items():
-        try:
-            CMD = '"%s" --state %s' % (sc, k)
-            x = subprocess.check_output(CMD, shell=True)
-            x = x.strip().decode('utf8')
-            v = v.strip()
-            if x != v:
-                ret[k] = v
-        except:
-            continue
+    with open(CHOSEN_OUT_FILE, 'a+') as f:
+        ret = OrderedDict()
+        for (k, v) in prefs_dict.items():
+            try:
+                CMD = '"%s" --state %s' % (sc, k)
+                x = subprocess.check_output(CMD, shell=True)
+                x = x.decode('utf8').strip()
+                v = v.strip()
+                if x != v:
+                    ret[k] = v
+            except:
+                import traceback
+                f.write('Exception in non_matching_keys: %s\n' % (CMD,))
+                f.write(traceback.format_exc())
+                f.flush()
+                continue
     return ret
 
 
