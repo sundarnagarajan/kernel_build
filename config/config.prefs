@@ -11,7 +11,7 @@
 # ------------------------------------------------------------------------
 USB_SERIAL=m
 # Wireguard
-CONFIG_WIREGUARD=m
+WIREGUARD=m
 # Enable staging drivers
 STAGING=y
 #
@@ -24,7 +24,7 @@ STAGING=y
 FONT_SUPPORT=y
 FONT_8x8=y
 FONT_8x16=y
-#FONTS=y
+FONTS=y
 #FONT_TER16x32=y
 #FONT_10x18=y
 #
@@ -32,7 +32,7 @@ FONT_8x16=y
 # Intel Cherry Trail platform
 # ------------------------------------------------------------------------
 # Make bluetooth work WITHOUT rfkill patch!
-CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+SERIAL_DEV_CTRL_TTYPORT=y
 # Wifi
 RTL8723BS=m
 # Battery state
@@ -51,7 +51,8 @@ HDMI_LPE_AUDIO=m
 # ------------------------------------------------------------------------
 # Disable new AMDGPU Display Engine - breaks DisplayPort on Radeon RX460
 # ------------------------------------------------------------------------
-DRM_AMD_DC=n
+# # Does not seem to be able to set this any more (in 5.9.0-rc7+)
+#DRM_AMD_DC=n
 #
 # ------------------------------------------------------------------------
 # Following are needed only till systemd v235 bug fix

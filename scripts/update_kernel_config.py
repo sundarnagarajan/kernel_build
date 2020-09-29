@@ -26,6 +26,9 @@ import subprocess
 from collections import OrderedDict
 import pexpect
 import time
+from functools import partial
+# use chardet to detect encoding
+import chardet
 # from answer_config_questions import answer_questions
 
 
@@ -61,7 +64,7 @@ def answer_questions(cmd, out_file, chosen_out_file=None):
         if ind == 0:      # EOF
             break
         elif ind == 1:      # TIMEOUT
-            debug(f, 'DEBUG: ----- TIMEOUT')
+            # debug(f, 'DEBUG: ----- TIMEOUT')
             c.sendline('')
             continue
         elif ind == 2:        # options to choose
@@ -131,10 +134,11 @@ def get_prefs(f):
     f-->file path
     Returns-->dict:
         Key-->Config key
-        Value-->config value: one of ['y', 'n', 'm']
+        Value-->str: config value
     '''
     ret = OrderedDict()
-    pat = '^\s*(?P<KEY>\S+)\s*=\s*(?P<VAL>\S+)'
+    # pat = '^\s*(?P<KEY>\S+)\s*=\s*(?P<VAL>\S+)'
+    pat = '^\s*(?P<KEY>\S+)\s*=\s*(?P<VAL>\S+.*?)$'
     try:
         for l in open(f, 'r').read().splitlines():
             m = re.search(pat, l)
@@ -188,8 +192,15 @@ def update_keys(prefs_dict, sc):
     '''
     with open(CHOSEN_OUT_FILE, 'a+') as f:
         for (k, v) in prefs_dict.items():
-            UNDEFINE_CMD = '%s -u %s ' % (sc, k)
-            SET_CMD = '%s --set-val %s %s' % (sc, k, v)
+            UNDEFINE_CMD = '%s --undefine %s' % (sc, k)
+            if v == 'm':
+                SET_CMD = '%s --module %s' % (sc, k)
+            if v == 'y':
+                SET_CMD = '%s --enable %s' % (sc, k)
+            if v == 'n':
+                SET_CMD = '%s --disable %s' % (sc, k)
+            else:
+                SET_CMD = '%s --set-val %s %s' % (sc, k, v)
             try:
                 CMD = UNDEFINE_CMD
                 subprocess.call(CMD, shell=True)
@@ -201,6 +212,142 @@ def update_keys(prefs_dict, sc):
                 f.write(traceback.format_exc())
                 f.flush()
                 continue
+
+
+class KernelConfigReader(object):
+    '''
+    '''
+    debug_available = True
+
+    @classmethod
+    def debug_fd(cls, fd, s):
+        if not cls.debug_available:
+            return
+        try:
+            if not s.endswith('\n'):
+                s = s + '\n'
+            fd.write(s)
+        except Exception as e:
+            msg = 'Exception: %s\n' % (str(e.args),)
+            msg = msg + 'Cannot write to %s\n' % (repr(fd),)
+            sys.stderr.write(msg)
+            cls.debug_available = False
+
+    def __init__(
+        self, encoding=None, debug=sys.stderr, nocomments=False, prefix='CONFIG_'
+    ):
+        '''
+        encoding-->str or None
+        debug-->file (or file-like object with write method)
+        nocomments-->bool:
+            set to True when processing prefs files
+            set to False when processing generated .config files
+        prefix-->str: Should not need to change
+        '''
+        self.__cfgdict = OrderedDict()
+        self.__encoding = encoding
+        self.__debug = debug
+        self.__prefix = prefix
+        self.__undef = 'undef'
+        self.__nocomments = nocomments
+        self.debug = partial(self.debug_fd, self.__debug)
+
+    def __file_contents(self, f):
+        '''
+        f-->str: file path
+        Returns-->(fstr-->str, encoding-->str)
+        '''
+        # First read in binary mode to detect encoding using chardet
+        fstr = open(f, 'rb').read()
+        try:
+            chardet_out = chardet.detect(fstr)
+            encoding = chardet_out.get('encoding', None)
+        except:
+            encoding = None
+        if not encoding:
+            self.debug('Could not detect encoding for %s\n' % (f,))
+            if self.encoding:
+                encoding = self.encoding
+            else:
+                encoding = 'utf-8'
+        # Retry with encoding
+        try:
+            self.debug('Trying with encoding: %s\n' % (str(encoding)))
+            fstr = open(f, 'r', encoding=encoding).read()
+            return (fstr, encoding)
+        except:
+            # Try with utf-8
+            if encoding.lower() not in ['utf-8', 'utf8']:
+                try:
+                    encoding = 'utf-8'
+                    self.debug('Retrying with encoding: %s\n' % (str(encoding)))
+                    fstr = open(f, 'r', encoding=encoding).read()
+                    return (fstr, encoding)
+                except:
+                    pass
+            # Last resort - try with 'latin1'
+            encoding = 'latin1'
+            self.debug('Retrying with encoding: %s\n' % (str(encoding)))
+            fstr = open(f, 'r', encoding=encoding).read()
+            return (fstr, encoding)
+
+    def check(self, f, prefs_dict=None):
+        '''
+        f-->str: path to .config
+        prefs_dict-->OrderDict or None
+        Returns-->OrderedDict:
+            key-->str: CONFIG_KEY without leading self.__prefix
+            value-->(src-->str, dest-->str):
+                src-->str: value of key in f (or self.__undef)
+                dest-->str: value of key in prefs_dict (or self.__undef)
+        '''
+        (fstr, encoding) = self.__file_contents(f)
+        del encoding
+        ret = OrderedDict()
+
+        for (k, v2) in prefs_dict.items():
+            pat = '^%s%s=.*$' % (self.__prefix, k)
+            l = re.findall(pat, fstr, re.MULTILINE)
+            if not l:
+                ret[k] = (self.__undef, v2)
+                continue
+            # Use LAST match - override earlier settings
+            l = l[-1]
+            l = l.strip()
+            pat = '^%s%s=(?P<CFG_VAL>\S+.*?)$' % (self.__prefix, k)
+            m = re.match(pat, l)
+            if not m:
+                ret[k] = (self.__undef, v2)
+                continue
+            try:
+                v1 = m.groupdict()['CFG_VAL']
+                if v1 == v2:
+                    continue
+                print('DEBUG: ', v1, v2)
+                ret[k] = (v1, v2)
+            except:
+                ret[k] = (self.__undef, v2)
+        return ret
+
+    @classmethod
+    def show_comparison(cls, d, pre=True):
+        '''
+        d-->OrderedDict: as returned by compare_prefs()
+        pre-->bool:
+            if True will just display what is GOING to be set
+            else will show what was NOT set successfully
+        '''
+        if not d:
+            print('All kernel config prefs have been set')
+            return
+        if pre:
+            print('Setting following kernel config prefs:')
+            for (k, (v1, v2)) in d.items():
+                print('    %s=%s   (original %s)' % (k, v2, v1))
+        else:
+            print('Following kernel config prefs were not set:')
+            for (k, (v1, v2)) in d.items():
+                print('    %s=%s   (original %s)' % (k, v2, v1))
 
 
 if __name__ == '__main__':
@@ -238,6 +385,7 @@ if __name__ == '__main__':
 
     # IMPORTANT - move to Linux kernel source dir
     os.chdir(BUILD_DIR)
+
     SCRIPTS_CONFIG = 'scripts/config'
 
     # Run make silentoldconfig once - always required
@@ -266,18 +414,6 @@ if __name__ == '__main__':
 
     # Update keys in config
     update_keys(to_change, SCRIPTS_CONFIG)
-    still_wrong = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=True)
-    if still_wrong:
-        print('Following kernel config prefs were not set after update_keys')
-        for (k, v) in still_wrong.items():
-            print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
-
-    import shutil
-    try:
-        os.unlink('.config.fixed')
-    except:
-        pass
-    shutil.copy('.config', '.config.fixed')
 
     # Run make silentoldconfig AGAIN - some new modules may have been enabled
     ret = answer_questions(
@@ -286,10 +422,21 @@ if __name__ == '__main__':
         print('Command failed: %s' % (CMD_AND_ARGS,))
         exit(ret)
 
-    still_wrong = non_matching_keys(prefs_dict, SCRIPTS_CONFIG, show_source=False)
-    if still_wrong:
-        print('Following prefs were not set after running make silentoldconfig:')
-        for (k, v) in still_wrong.items():
-            print('\t%s = |%s| (current: |%s|)' % (k, prefs_dict.get(k), v))
-    else:
-        print('All your kernel config prefs have been set')
+    with open(CHOSEN_OUT_FILE, 'a+') as debug_file:
+        cfg = KernelConfigReader(
+            encoding='ascii',
+            debug=debug_file,
+            nocomments=True
+        )
+        still_wrong = cfg.check(
+            f=KERNEL_CONFIG,
+            prefs_dict=prefs_dict
+        )
+        debug_file.flush()
+        debug_file.close()
+        cfg.show_comparison(d=still_wrong, pre=False)
+
+    # Some kernel config prefs just do not get set / get reversed by
+    # 'make silentoldconfig'
+    # We just report those but do not fail on them
+    exit(0)
