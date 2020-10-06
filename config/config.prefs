@@ -21,10 +21,10 @@ STAGING=y
 # kernel command line: fbcon=font:TER16x32
 # See: https://www.kernel.org/doc/Documentation/fb/fbcon.txt
 # ------------------------------------------------------------------------
-#FONT_SUPPORT=y
-#FONT_8x8=y
-#FONT_8x16=y
-#FONTS=y
+FONT_SUPPORT=y
+FONTS=y
+FONT_8x8=y
+FONT_8x16=y
 FONT_TER16x32=y
 FONT_10x18=y
 #
@@ -52,7 +52,7 @@ HDMI_LPE_AUDIO=m
 # Disable new AMDGPU Display Engine - breaks DisplayPort on Radeon RX460
 # ------------------------------------------------------------------------
 # Does not seem to be able to set this any more (in 5.9.0-rc7+)
-DRM_AMD_DC=n
+#DRM_AMD_DC=n
 #
 # ------------------------------------------------------------------------
 # Following are needed only till systemd v235 bug fix
