@@ -134,9 +134,9 @@ def path_2_nt(p, expanduser=True, expandvars=False):
         if exists:
             p = os.path.normpath(p)
             if expanduser:
-                p = expanduser(p)
+                p = os.path.expanduser(p)
             if expandvars:
-                p = expandvars(p)
+                p = os.path.expandvars(p)
             isfile = os.path.isfile(p)
             isdir = os.path.isdir(p)
             islink = os.path.islink(p)
@@ -144,12 +144,16 @@ def path_2_nt(p, expanduser=True, expandvars=False):
         if os.path.isdir(d):
             d = os.path.normpath(d)
             if expanduser:
-                d = expanduser(d)
+                d = os.path.expanduser(d)
             if expandvars:
-                d = expandvars(d)
+                d = os.path.expandvars(d)
+            realpath_dir = d
         b = os.path.basename(p)
         normpath = os.path.join(d, b)
-    except:
+        if exists:
+            realpath = normpath
+    except Exception as e:
+        print(format_exc(e, msg='PathNT %s' % (p,)))
         pass
     return PathNT(
         exists=exists,
@@ -331,23 +335,21 @@ class FileWriteSingleton(Singleton):
             with a 'write' method
         Returns: file-like object or None
         '''
-        mode = 'a+'
-        encoding = self.__encoding
 
         if isinstance(f, str):
+            mode = 'a+'
+            encoding = self.__encoding
             p = path_2_nt(f, expanduser=expanduser, expandvars=expandvars)
-            if p.exists or p.dir_exists:
-                try:
-                    if encoding:
-                        return open(f, mode=mode, encoding=encoding)
-                    else:
-                        return open(f, mode=mode)
-                except:
-                    msg = 'Could not write to %s' % (f,)
-                    self.__write_error(msg)
-                    return None
-            else:
-                msg = 'Could not open or create %s' % (f,)
+
+            if p.dir_exists and not p.exists:
+                mode = 'w+'
+            try:
+                if encoding:
+                    return open(f, mode=mode, encoding=encoding)
+                else:
+                    return open(f, mode=mode)
+            except:
+                msg = 'Could not write to %s' % (f,)
                 self.__write_error(msg)
                 return None
         else:    # ASSUMED to be a file-like object
@@ -373,6 +375,12 @@ class FileWriteSingleton(Singleton):
             if not s.endswith('\n'):
                 s += '\n'
             self.__fd.write(s)
+            '''
+            try:
+                self.__fd.flush()
+            except:
+                pass
+            '''
         except Exception as e:
             if not self.__warned:
                 msg = 'Could not write to %s' % (self.__name,)
