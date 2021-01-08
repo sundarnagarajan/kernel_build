@@ -24,7 +24,6 @@ fi
 echo ""
 metapkg_set_vars
 metapkg_check_input_files
-(cd "${METAPKG_BUILD_DIR}" && rm -rf * )
 
 metapkg_build_debs "image" "$METAPKG_I_DEB"
 metapkg_build_debs "headers" "$METAPKG_H_DEB"

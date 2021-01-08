@@ -20,6 +20,15 @@ SCRIPT_DIR="${PROG_DIR}"
 
 $LOCAL_UPLOAD_CHECK_REQD_PKGS_SCRIPT || exit 1
 local_upload_set_vars
+
+echo ""
+echo "------------------- Signing source packages --------------------"
+echo "You will have to enter your passphrase for signing metapackages"
+echo "Press RETURN to continue"
+echo "----------------------------------------------------------------"
+echo ""
+read ___a
+
 if [ -n "$LOCAL_DEB_REPO_DIR" -a -n "$KERNEL_BUILD_DIR" ]; then
     local_upload_do_kernel_upload
 else
@@ -32,19 +41,3 @@ else
     echo "Either LOCAL_DEB_REPO_DIR or METAPKG_BUILD_DIR not set"
     echo "Not trying local upload of metapackage DEBs"
 fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

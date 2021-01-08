@@ -21,12 +21,21 @@ SCRIPT_DIR="${PROG_DIR}"
 $LOCAL_UPLOAD_CHECK_REQD_PKGS_SCRIPT || exit 1
 local_upload_set_vars
 
+if [ -n "$LOCAL_DEB_REPO_DIR" ]; then
+    echo ""
+    echo "------------------- Signing source packages --------------------"
+    echo "You will have to enter your passphrase for signing metapackages"
+    echo "Press RETURN to continue"
+    echo "----------------------------------------------------------------"
+    echo ""
+    read ___a
+fi
+
 # Delete debs in $DEB_DIR and $METAPKG_BUILD_DIR
 cd $DEB_DIR
 for d in $DEB_DIR "$METAPKG_BUILD_DIR"
 do
-    cd $d
-    for f in *.deb
+    for f in $(ls -1 "$d"/*.deb)
     do
         pkg=$(dpkg-deb -f $f Package)
         for dist in $LOCAL_DEB_DISTS
@@ -35,6 +44,7 @@ do
         done
     done
 done
+
 
 if [ -n "$LOCAL_DEB_REPO_DIR" -a -n "$KERNEL_BUILD_DIR" ]; then
     local_upload_do_kernel_upload

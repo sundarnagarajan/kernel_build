@@ -19,6 +19,14 @@ ppa_upload_check_deb_dir || exit 1
 ppa_upload_set_vars
 $PPA_UPLOAD_CHECK_REQD_PKGS_SCRIPT || exit 1
 
+echo ""
+echo "------------------- Signing source packages --------------------"
+echo "You will have to enter your passphrase for signing metapackages"
+echo "Press RETURN to continue"
+echo "----------------------------------------------------------------"
+echo ""
+read ___a
+
 ppa_upload_build_src_changes || exit 1
 ppa_upload_upload_src_to_ppa || exit 1
 

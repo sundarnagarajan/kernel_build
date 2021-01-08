@@ -26,6 +26,15 @@ reupload_rebuild_src_pkg "$@"
 ppa_upload_set_vars
 ppa_upload_check_deb_dir || exit 1
 
+
+echo ""
+echo "------------------- Signing source packages --------------------"
+echo "You will have to enter your passphrase for signing metapackages"
+echo "Press RETURN to continue"
+echo "----------------------------------------------------------------"
+echo ""
+read ___a
+
 reupload_upload_src_to_ppa
 
 echo "-------------------------- PPA upload time -----------------------------------"

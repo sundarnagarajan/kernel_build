@@ -1,0 +1,191 @@
+Kernel prefs:
+============
+
+Example:
+-------
+    # See README for format of this file
+    # Lines starting with # are ignored
+    # Empty lines are ignored
+    # Each valid line must be of the form:
+    #   name=value
+    #     OR
+    #   name = value
+
+    # ------------------------------------------------------------------------
+    # Make USB_SERIAL a MODULE so that module options can be set
+    # ------------------------------------------------------------------------
+    USB_SERIAL=m
+    # Wireguard
+    WIREGUARD=m
+    # Enable staging drivers
+    STAGING=y
+
+    # ------------------------------------------------------------------------
+    # Set built-in kernel fonts - useful on HiDPI displays
+    # To use Terminus 16x32 HiDPI font add following to
+    # kernel command line: fbcon=font:TER16x32
+    # See: https://www.kernel.org/doc/Documentation/fb/fbcon.txt
+    # ------------------------------------------------------------------------
+    FONT_SUPPORT=y
+    FONTS=y
+    #FONT_8x8=y
+    #FONT_8x16=y
+    FONT_TER16x32=y
+    FONT_10x18=y
+
+    # ------------------------------------------------------------------------
+    # Intel Cherry Trail platform
+    # ------------------------------------------------------------------------
+    # Make bluetooth work WITHOUT rfkill patch!
+    SERIAL_DEV_CTRL_TTYPORT=y
+    # Wifi
+    RTL8723BS=m
+    # Battery state
+    INTEL_SOC_PMIC_CHTWC=y
+    AXP288_CHARGER=m
+    AXP288_FUEL_GAUGE=m
+    EXTCON_AXP288=m
+    AXP288_ADC=m
+    # Sound
+    SND_SOC_INTEL_BYT_CHT_ES8316_MACH=m
+    SND_SOC_ES8316=m
+    SND_SOC_INTEL_BYTCR_RT5651_MACH=m
+    SND_SOC_RT5651=m
+    HDMI_LPE_AUDIO=m
+
+    # ------------------------------------------------------------------------
+    # Disable new AMDGPU Display Engine - breaks DisplayPort on Radeon RX460
+    # ------------------------------------------------------------------------
+    # Does not seem to be able to set this any more (in 5.9.0-rc7+)
+    DRM_AMD_DC=n
+
+    # ------------------------------------------------------------------------
+    # Following are needed only till systemd v235 bug fix
+    # Avoid errors like '... egress BPF program ...'
+    # See https://github.com/systemd/systemd/issues/7054
+    # Ubuntu Bionic 18.04.5 has systemd versio 237-3ubuntu10.42
+    # ------------------------------------------------------------------------
+    #CGROUP_BPF=y
+
+    # ------------------------------------------------------------------------
+    # For kernel 5.4+ with virtualbox-6.1
+    # See https://www.virtualbox.org/ticket/18945#comment:19
+    # Not enabled yet - virtualbox-6.1 works without these
+    # ------------------------------------------------------------------------
+    #
+    # CONFIG_UNUSED_SYMBOLS=n
+    # CONFIG_TRIM_UNUSED_KSYMS=n
+
+    # Variants that ARE valid lines
+    # Spaces surrounding '=' are optional and acceptable
+    FONTS = y
+    # Variants that are INVALID which will be ignored
+    # CFG_KEY is not upper case
+    MyConfigVal = y
+    # CFG KEY contains spaces
+    MY CONFIG KEY = m
+    # CFG_KEY is mixed case and contains spaces
+    Config Key with Spaces = m
+
+
+Types of lines:
+--------------
+    - Blank lines
+        - Contain nothing but white space
+        - Match regex pattern '^[[:space:]]*$'
+        - Are ignored
+
+    - "UNDEF comment lines":
+        - CFG_KEY successfully extracted with pattern:
+            '^[[:space:]]*#[[:space:]]*(?P<CFG_KEY>\S+)\s+ is not set$'
+        - CFG_KEY does not contain white space (part of matching regex pattern)
+        - CFG_KEY.upper() == CFG_KEY
+
+    - Comment lines
+        - Matches regex pattern '^[[:space:]]*#'
+        - Are ignored
+
+    - VALID "SET lines":
+        - Matches regex pattern '^\S+.*?\s*=\s*\S+.*?$'
+        - CFG_KEY and CFG_VAL successfully extracted with pattern:
+            '^(?P<CFG_KEY>\S+)\s*=\s*(?P<CFG_VAL>\S+.*?)$'
+        - CFG_KEY does not contain white space (part of matching regex pattern)
+        - CFG_KEY.upper() == CFG_KEY
+        - CGF_VAL starts with non-whitespace (part of matching regex pattern)
+        - CFG_VAL not empty (part of matching regex pattern)
+
+    - All other lines
+        - Invalid lines
+        - Are ignored with debug message 
+
+Example of extracted VALID Set lines from above example:
+-------------------------------------------------------
+    USB_SERIAL=m
+    WIREGUARD=m
+    STAGING=y
+    FONT_SUPPORT=y
+    FONTS=y
+    FONT_TER16x32=y
+    FONT_10x18=y
+    SERIAL_DEV_CTRL_TTYPORT=y
+    RTL8723BS=m
+    INTEL_SOC_PMIC_CHTWC=y
+    AXP288_CHARGER=m
+    AXP288_FUEL_GAUGE=m
+    EXTCON_AXP288=m
+    AXP288_ADC=m
+    SND_SOC_INTEL_BYT_CHT_ES8316_MACH=m
+    SND_SOC_ES8316=m
+    SND_SOC_INTEL_BYTCR_RT5651_MACH=m
+    SND_SOC_RT5651=m
+    HDMI_LPE_AUDIO=m
+    DRM_AMD_DC=n
+    FONTS = y
+
+Parsing (list of) prefs files:
+-----------------------------
+    
+    BLANK_LINE = 0
+    UNDEF_LINE = 1
+    COMMENT_LINE = 2
+    SET_LINE = 3
+    INVALID_LINE = 4
+
+    BLANK_LINE_PAT = '^[[:space:]]*$'
+    UNDEF_LINE_PAT = '^[[:space:]]*#[[:space:]]*(?P<CFG_KEY>\S+)\s+ is not set$'
+    COMMENT_LINE_PAT = '^[[:space:]]*#'
+    SET_LINE_PAT = '^(?P<CFG_KEY>\S+)\s*=\s*(?P<CFG_VAL>\S+.*?)$'
+
+
+    namedtuple line
+        line_num-->int: 1-based line number
+        line_type-->int: one of:
+            BLANK_LINE | UNDEF_LINE | COMMENT_LINE | SET_LINE | INVALID_LINE
+
+        line_text-->str: stripped line text
+
+        k-->str: CFG_KEY or None
+        v-->str: CFG_VAL or None
+
+def __file_contents(f, encoding='ascii'):
+    '''
+    f-->str: file path
+    encoding-->str or None
+    Returns-->(encoding, s):
+        encoding-->str
+        s-->str: file contents
+    '''
+    pass
+    
+def parse_file(f, encoding='ascii'):
+    '''
+    f-->str: file path
+    encoding-->str or None
+    Returns-->(encoding, l):
+        encoding-->str
+        l-->list of line namedtuple
+    '''
+    contents = 
+    pass
+
+

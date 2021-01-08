@@ -137,7 +137,7 @@ SHOW_CONFIG_VER_SCRIPT=show_config_version.py
 UPDATE_CONFIG_SCRIPT=update_kernel_config.py
 CHECK_REQD_PKGS_SCRIPT=required_pkgs.sh
 METAPACKAGE_BUILD_SCRIPT=metapackage_build.sh
-LOCAL_UPLOAD_SCRIPT=local_upload.sh
+LOCAL_UPLOAD_SCRIPT=local_reupload.sh
 WRITE_CHANGELOG_SCRIPT=write_change_log.sh
 
 # Kernel image build target
@@ -347,6 +347,51 @@ function choose_num_threads() {
     echo $TARGETED_CORES
 }
 
+function read_config {
+    #-------------------------------------------------------------------------
+    # Uses KERNEL_BUILD_CONFIG if set to choose config file - defaults to
+    # ~/.kernel_build.config
+    # If KERNEL_BUILD_CONFIG is not set, ~/.kernel_build.config is used
+    # If KERNEL_BUILD_CONFIG is set to "/dev/null", NO config is used
+    # If config file is found - through KERNEL_BUILD_CONFIG or the default
+    #     AND sourcing config gives an error
+    # THEN it is an ERROR
+    # If config file is found - through KERNEL_BUILD_CONFIG or the default
+    #     AND config is missing or cannot be read, config is IGNORED - same
+    #     as setting KERNEL_BUILD_CONFIG=/dev/null
+    #-------------------------------------------------------------------------
+
+    if [ "$KERNEL_BUILD_CONFIG" = "/dev/null" ]; then
+        echo "Not using any config: KERNEL_BUILD_CONFIG = /dev/null"
+        return
+    fi
+    if [ -n "$KERNEL_BUILD_CONFIG" ]; then
+        KBUILD_CONFIG=$KERNEL_BUILD_CONFIG
+    fi
+    if [ -f "$KBUILD_CONFIG" ]; then
+        if [ -r "$KBUILD_CONFIG" ]; then
+            # Ignore errors about read-only vars
+            . "$KBUILD_CONFIG" 2>/dev/null
+            if [ $? -ne 0 ]; then
+                echo "Error sourcing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+                return 1
+            fi
+        else
+            echo "Ignoring unreadable KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+        fi
+    else
+        echo "Ignoring missing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
+    fi
+    
+    #-------------------------------------------------------------------------
+    # Export all config / environment variables that are set (for sub-shells)
+    #-------------------------------------------------------------------------
+    for v in $CONFIG_VARS
+    do
+        if [ -n "${!v}" ]; then export $v; fi
+    done
+}
+
 function set_vars {
     #-------------------------------------------------------------------------
     # Strip off directory path components if we expect only filenames
@@ -417,11 +462,12 @@ function set_vars {
     DEBUG_DIR=${KB_TOP_DIR}/debug
     METAPKG_BUILD_DIR=${KB_TOP_DIR}/meta
 
-    # Dir names cannot be changed
+    # Dir names cannot be changed - also export them
      for v in KERNEL_BUILD_DIR KB_TOP_DIR BUILD_DIR_PARENT BUILD_DIR DEB_DIR \
          DEBUG_DIR METAPKG_BUILD_DIR
           do
               readonly $v
+              export $v
           done
 
     # Debug outputs are always in DEBUG_DIR
@@ -503,6 +549,10 @@ function set_vars {
                 unset KERN_VER
             else
                 readonly KERN_VER
+                export KERN_VER
+                # At this time, IFF KERNEL_BUILD_ZFS=yes, we can check maximum version
+                # supported by zfzonlinux as follows:
+                # curl -s 'https://raw.githubusercontent.com/openzfs/zfs/master/META' | grep '^Linux-Maximum:' |awk -F': ' '{print $2}'
             fi
         else
             unset KERN_VER
@@ -604,50 +654,6 @@ function show_vars() {
     printf "%-24s : %s\n" "Metapackage build output" "$METAPKG_BUILD_OUT_FILEPATH"
     printf "%-24s : %s\n" "Local upload output" "$LOCAL_UPLOAD_BUILD_OUT_FILEPATH"
 
-}
-
-function read_config {
-    #-------------------------------------------------------------------------
-    # Uses KERNEL_BUILD_CONFIG if set to choose config file - defaults to
-    # ~/.kernel_build.config
-    # If KERNEL_BUILD_CONFIG is not set, ~/.kernel_build.config is used
-    # If KERNEL_BUILD_CONFIG is set to "/dev/null", NO config is used
-    # If config file is found - through KERNEL_BUILD_CONFIG or the default
-    #     AND sourcing config gives an error
-    # THEN it is an ERROR
-    # If config file is found - through KERNEL_BUILD_CONFIG or the default
-    #     AND config is missing or cannot be read, config is IGNORED - same
-    #     as setting KERNEL_BUILD_CONFIG=/dev/null
-    #-------------------------------------------------------------------------
-
-    if [ "$KERNEL_BUILD_CONFIG" = "/dev/null" ]; then
-        echo "Not using any config: KERNEL_BUILD_CONFIG = /dev/null"
-        return
-    fi
-    if [ -n "$KERNEL_BUILD_CONFIG" ]; then
-        KBUILD_CONFIG=$KERNEL_BUILD_CONFIG
-    fi
-    if [ -f "$KBUILD_CONFIG" ]; then
-        if [ -r "$KBUILD_CONFIG" ]; then
-            . "$KBUILD_CONFIG" 2>/dev/null
-            if [ $? -ne 0 ]; then
-                echo "Error sourcing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
-                return 1
-            fi
-        else
-            echo "Ignoring unreadable KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
-        fi
-    else
-        echo "Ignoring missing KERNEL_BUILD_CONFIG : $KBUILD_CONFIG"
-    fi
-    
-    #-------------------------------------------------------------------------
-    # Export all config / environment variables that are set (for sub-shells)
-    #-------------------------------------------------------------------------
-    for v in $CONFIG_VARS
-    do
-        if [ -n "${!v}" ]; then export $v; fi
-    done
 }
 
 function is_linux_kernel_source()
@@ -776,10 +782,6 @@ function can_build_metapackage_first() {
 }
 
 function get_kernel_source {
-    # Also calls build_metapackages - before or after retrieving kernel source
-    # Depending on whether kernel version is known before retrieving kernel
-    # source
-
     # Uses:
     #   START_END_TIME_FILEPATH
     #   KERNEL_SOURCE_SCRIPT
@@ -1319,6 +1321,8 @@ function metapkg_build_debs() {
     # $1: image|headers
     # $2: control file: $METAPKG_I_DEB or $METAPKG_H_DEB
 
+    >&2 echo "DEBUG METAPKG_BUILD_DIR : $METAPKG_BUILD_DIR"
+
     local PKG_NAME_EXT="$1"
     local PKG_CONTROL_FILE="$2"
     cat "$PKG_CONTROL_FILE" | sed -e "s/${METAPKG_TOKEN_VERSION}/${KERN_VER}/g" -e "s/${METAPKG_TOKEN_PREFIX}/${META_PKGNAME_PREFIX}/g" -e "s/${METAPKG_TOKEN_MAINTAINER}/${MAINTAINER}/g" > "${METAPKG_BUILD_DIR}/${PKG_NAME_EXT}"
@@ -1386,12 +1390,12 @@ function local_upload_do_kernel_upload() {
     echo "--------- Uploading kernel DEBs to local repository ----------"
     echo "Found following DEB files:"
     echo ""
-    ls -1 *.deb | sed -e "s/^/${INDENT}/"
+    ls -1 *.deb 2>/dev/null | sed -e "s/^/${INDENT}/"
     echo ""
 
     for dist in $LOCAL_DEB_DISTS
     do
-       for deb_file in *.deb
+        for deb_file in $(ls -1 *.deb 2>/dev/null)
         do
             echo "Adding $deb_file to dist $dist"
             reprepro --basedir $LOCAL_DEB_REPO_DIR includedeb $dist $deb_file >> ${LOCAL_UPLOAD_BUILD_OUT_FILEPATH} 2>&1
@@ -1408,12 +1412,12 @@ function local_upload_do_metapkg_upload() {
     echo "--------- Uploading metapackage DEBs to local repository ----------"
     echo "Found following DEB files:"
     echo ""
-    ls -1 *.deb | sed -e "s/^/${INDENT}/"
+    ls -1 *.deb 2>/dev/null | sed -e "s/^/${INDENT}/"
     echo ""
 
     for dist in $LOCAL_DEB_DISTS
     do
-       for deb_file in *.deb
+        for deb_file in $(ls -1 *.deb 2>/dev/null)
         do
             echo "Adding $deb_file to dist $dist"
             reprepro --basedir $LOCAL_DEB_REPO_DIR includedeb $dist $deb_file >> ${LOCAL_UPLOAD_BUILD_OUT_FILEPATH} 2>&1
